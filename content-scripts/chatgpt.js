@@ -5,6 +5,53 @@ let observationTimeout = null;
 let observer = null;
 let activeQuestionId = null;
 const LOG_PREFIX = "[Auto-McGraw][chatgpt]";
+const PERF_LOGGING_ENABLED = true;
+const INPUT_READY_TIMEOUT_MS = 10000;
+const SEND_READY_TIMEOUT_MS = 10000;
+const READINESS_POLL_INTERVAL_MS = 50;
+
+function logPerf(message, ...args) {
+  if (!PERF_LOGGING_ENABLED) return;
+  console.info(LOG_PREFIX, "[perf]", message, ...args);
+}
+
+function waitForCondition(
+  predicate,
+  timeout = 5000,
+  pollIntervalMs = READINESS_POLL_INTERVAL_MS
+) {
+  return new Promise((resolve, reject) => {
+    const startTime = Date.now();
+
+    const attempt = () => {
+      let result = null;
+      try {
+        result = predicate();
+      } catch (error) {}
+
+      if (result) {
+        resolve(result);
+        return;
+      }
+
+      if (Date.now() - startTime >= timeout) {
+        reject(new Error("Timed out waiting for condition"));
+        return;
+      }
+
+      setTimeout(attempt, pollIntervalMs);
+    };
+
+    attempt();
+  });
+}
+
+function isSendButtonReady(button) {
+  if (!button) return false;
+  if (button.disabled) return false;
+  if (button.getAttribute("aria-disabled") === "true") return false;
+  return true;
+}
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "receiveQuestion") {
@@ -43,6 +90,7 @@ function resetObservation() {
 }
 
 async function insertQuestion(questionData) {
+  const insertStartAt = Date.now();
   const { type, question, options, previousCorrection, previousFormatIssue } =
     questionData;
   let text = `Type: ${type}\nQuestion: ${question}`;
@@ -94,32 +142,30 @@ async function insertQuestion(questionData) {
 
   text +=
     '\n\nRespond with ONLY a valid JSON object with keys "answer" and "explanation". The "answer" field is required. Do not wrap the JSON in markdown or code fences. Escape any internal double quotes in strings (for example: \\"text\\"). Explanations should be no more than one sentence. DO NOT acknowledge corrections or format reminders; only answer the current question.';
+  const inputArea = await waitForCondition(
+    () => document.getElementById("prompt-textarea"),
+    INPUT_READY_TIMEOUT_MS
+  );
 
-  return new Promise((resolve, reject) => {
-    const inputArea = document.getElementById("prompt-textarea");
-    if (inputArea) {
-      setTimeout(() => {
-        inputArea.focus();
-        inputArea.innerHTML = `<p>${text}</p>`;
-        inputArea.dispatchEvent(new Event("input", { bubbles: true }));
+  inputArea.focus();
+  inputArea.innerHTML = `<p>${text}</p>`;
+  inputArea.dispatchEvent(new Event("input", { bubbles: true }));
 
-        setTimeout(() => {
-          const sendButton = document.querySelector(
-            '[data-testid="send-button"]'
-          );
-          if (sendButton) {
-            sendButton.click();
-            startObserving();
-            resolve();
-          } else {
-            reject(new Error("Send button not found"));
-          }
-        }, 300);
-      }, 300);
-    } else {
-      reject(new Error("Input area not found"));
-    }
-  });
+  const sendButton = await waitForCondition(
+    () => {
+      const button = document.querySelector('[data-testid="send-button"]');
+      return isSendButtonReady(button) ? button : null;
+    },
+    SEND_READY_TIMEOUT_MS
+  );
+
+  sendButton.click();
+  logPerf(
+    `${activeQuestionId || "unknown"} promptReady->sendClicked ${
+      Date.now() - insertStartAt
+    }ms`
+  );
+  startObserving();
 }
 
 function startObserving() {
@@ -174,6 +220,7 @@ function startObserving() {
       if (hasAnswerField && !hasResponded) {
         hasResponded = true;
         console.info(LOG_PREFIX, "Sending response", activeQuestionId);
+        logPerf(`${activeQuestionId || "unknown"} responseDetected->forward 0ms`);
         chrome.runtime
           .sendMessage({
             type: "chatGPTResponse",
@@ -192,6 +239,7 @@ function startObserving() {
       if (!hasResponded) {
         hasResponded = true;
         console.warn(LOG_PREFIX, "Response missing answer field", activeQuestionId);
+        logPerf(`${activeQuestionId || "unknown"} forwarding_format_error`);
         chrome.runtime
           .sendMessage({
             type: "chatGPTResponse",

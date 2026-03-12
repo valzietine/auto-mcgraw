@@ -7,10 +7,95 @@ let pendingQuestionId = null;
 let questionSequence = 0;
 let lastResponseFormatIssue = null;
 const LOG_PREFIX = "[Auto-McGraw][mhe]";
+const PERF_LOGGING_ENABLED = true;
+const READINESS_POLL_INTERVAL_MS = 60;
+const NEXT_STEP_RETRY_DELAY_MS = 240;
+const QUESTION_TRANSITION_TIMEOUT_MS = 4500;
+let scheduledNextStepTimeoutId = null;
+let isCheckingNextStep = false;
+const questionPerfMarks = new Map();
+let pendingAdvancePerf = null;
 
 function createQuestionId() {
   questionSequence += 1;
   return `mhe_${Date.now()}_${questionSequence}`;
+}
+
+function logPerf(message, ...args) {
+  if (!PERF_LOGGING_ENABLED) return;
+  console.info(LOG_PREFIX, "[perf]", message, ...args);
+}
+
+function ensureQuestionPerfEntry(questionId) {
+  if (!questionId) return null;
+  if (!questionPerfMarks.has(questionId)) {
+    questionPerfMarks.set(questionId, { questionId });
+  }
+  return questionPerfMarks.get(questionId);
+}
+
+function markQuestionPerf(questionId, key, timestamp = Date.now()) {
+  const perfEntry = ensureQuestionPerfEntry(questionId);
+  if (!perfEntry) return null;
+  perfEntry[key] = timestamp;
+  return perfEntry;
+}
+
+function clearQuestionPerf(questionId) {
+  if (!questionId) return;
+  questionPerfMarks.delete(questionId);
+}
+
+function waitForCondition(
+  predicate,
+  timeout = 5000,
+  pollIntervalMs = READINESS_POLL_INTERVAL_MS
+) {
+  return new Promise((resolve, reject) => {
+    const startTime = Date.now();
+
+    const attempt = () => {
+      let result = null;
+      try {
+        result = predicate();
+      } catch (error) {}
+
+      if (result) {
+        resolve(result);
+        return;
+      }
+
+      if (Date.now() - startTime >= timeout) {
+        reject(new Error("Timed out waiting for condition"));
+        return;
+      }
+
+      setTimeout(attempt, pollIntervalMs);
+    };
+
+    attempt();
+  });
+}
+
+function waitForEnabledElement(selector, timeout = 5000) {
+  return waitForCondition(() => {
+    const element = document.querySelector(selector);
+    return element && !isElementDisabled(element) ? element : null;
+  }, timeout);
+}
+
+function scheduleCheckForNextStep(delayMs = 0, reason = "") {
+  if (!isAutomating) return;
+
+  if (scheduledNextStepTimeoutId !== null) {
+    clearTimeout(scheduledNextStepTimeoutId);
+  }
+
+  scheduledNextStepTimeoutId = setTimeout(() => {
+    scheduledNextStepTimeoutId = null;
+    if (!isAutomating || isCheckingNextStep) return;
+    checkForNextStep(reason);
+  }, delayMs);
 }
 
 function setupMessageListener() {
@@ -67,9 +152,7 @@ function setupMessageListener() {
       pendingQuestionId = null;
 
       if (isAutomating) {
-        setTimeout(() => {
-          checkForNextStep();
-        }, 500);
+        scheduleCheckForNextStep(0, "ai_request_timeout");
       }
 
       sendResponse({ received: true });
@@ -90,12 +173,7 @@ function handleTopicOverview() {
     continueButton.textContent.trim().toLowerCase().includes("continue")
   ) {
     continueButton.click();
-
-    setTimeout(() => {
-      if (isAutomating) {
-        checkForNextStep();
-      }
-    }, 1000);
+    scheduleCheckForNextStep(NEXT_STEP_RETRY_DELAY_MS, "topic_overview_continue");
 
     return true;
   }
@@ -106,6 +184,17 @@ function clearMatchingPauseWatcher() {
   if (matchingPauseIntervalId !== null) {
     clearInterval(matchingPauseIntervalId);
     matchingPauseIntervalId = null;
+  }
+}
+
+function clearAutomationRuntimeState() {
+  pendingQuestionId = null;
+  pendingAdvancePerf = null;
+  questionPerfMarks.clear();
+
+  if (scheduledNextStepTimeoutId !== null) {
+    clearTimeout(scheduledNextStepTimeoutId);
+    scheduledNextStepTimeoutId = null;
   }
 }
 
@@ -161,13 +250,14 @@ function advanceCompletedQuestionIfNeeded(container) {
   }
 
   console.info(LOG_PREFIX, "Question already completed; advancing to next");
+  const transitionSnapshot = getQuestionTransitionSnapshot(container);
   nextButton.click();
 
-  setTimeout(() => {
-    if (isAutomating) {
-      checkForNextStep();
+  waitForQuestionTransition(transitionSnapshot, QUESTION_TRANSITION_TIMEOUT_MS).finally(
+    () => {
+      scheduleCheckForNextStep(0, "advance_completed_question");
     }
-  }, 1000);
+  );
 
   return true;
 }
@@ -180,6 +270,70 @@ function getQuestionSignature(container) {
     container.querySelector(".prompt")?.textContent?.trim() || "";
 
   return `${questionType}::${normalizeChoiceText(promptText)}`;
+}
+
+function getQuestionTransitionSnapshot(container) {
+  if (!container) return null;
+
+  return {
+    signature: getQuestionSignature(container),
+    promptText: normalizeChoiceText(
+      container.querySelector(".prompt")?.textContent?.trim() || ""
+    ),
+    completed: isQuestionCompleted(container),
+  };
+}
+
+function hasQuestionTransitioned(previousSnapshot) {
+  if (!previousSnapshot) return false;
+
+  const currentContainer = document.querySelector(".probe-container");
+  if (!currentContainer) return false;
+
+  const currentSignature = getQuestionSignature(currentContainer);
+  if (
+    previousSnapshot.signature &&
+    currentSignature &&
+    currentSignature !== previousSnapshot.signature
+  ) {
+    return true;
+  }
+
+  const currentPromptText = normalizeChoiceText(
+    currentContainer.querySelector(".prompt")?.textContent?.trim() || ""
+  );
+  if (
+    previousSnapshot.promptText &&
+    currentPromptText &&
+    currentPromptText !== previousSnapshot.promptText
+  ) {
+    return true;
+  }
+
+  const currentCompleted = isQuestionCompleted(currentContainer);
+  if (previousSnapshot.completed && !currentCompleted) {
+    return true;
+  }
+
+  return false;
+}
+
+async function waitForQuestionTransition(
+  previousSnapshot,
+  timeout = QUESTION_TRANSITION_TIMEOUT_MS
+) {
+  if (!previousSnapshot) return false;
+
+  try {
+    await waitForCondition(
+      () => hasQuestionTransitioned(previousSnapshot),
+      timeout,
+      READINESS_POLL_INTERVAL_MS
+    );
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 
 function pauseForManualMatchingAndResume(questionSignature) {
@@ -208,13 +362,9 @@ function pauseForManualMatchingAndResume(questionSignature) {
       );
       clearMatchingPauseWatcher();
 
-      setTimeout(() => {
-        if (isAutomating) {
-          checkForNextStep();
-        }
-      }, 500);
+      scheduleCheckForNextStep(0, "manual_matching_resume");
     }
-  }, 400);
+  }, 250);
 }
 
 function handleForcedLearning() {
@@ -234,16 +384,23 @@ function handleForcedLearning() {
           return waitForElement(".next-button", 10000);
         })
         .then((nextButton) => {
+          const transitionSnapshot = getQuestionTransitionSnapshot(
+            document.querySelector(".probe-container")
+          );
           nextButton.click();
           if (isAutomating) {
-            setTimeout(() => {
-              checkForNextStep();
-            }, 1000);
+            waitForQuestionTransition(
+              transitionSnapshot,
+              QUESTION_TRANSITION_TIMEOUT_MS
+            ).finally(() => {
+              scheduleCheckForNextStep(0, "forced_learning_advance");
+            });
           }
         })
         .catch((error) => {
           console.error("Error in forced learning flow:", error);
           isAutomating = false;
+          clearAutomationRuntimeState();
           clearMatchingPauseWatcher();
         });
       return true;
@@ -252,46 +409,70 @@ function handleForcedLearning() {
   return false;
 }
 
-function checkForNextStep() {
+function checkForNextStep(trigger = "direct") {
   if (!isAutomating) return;
-  if (pendingQuestionId) {
-    console.info(LOG_PREFIX, "Waiting for response", pendingQuestionId);
+  if (isCheckingNextStep) {
+    scheduleCheckForNextStep(0, `${trigger}_dedupe`);
     return;
   }
 
-  if (handleTopicOverview()) {
-    return;
-  }
+  isCheckingNextStep = true;
 
-  if (handleForcedLearning()) {
-    return;
-  }
-
-  const container = document.querySelector(".probe-container");
-  if (container && !container.querySelector(".forced-learning")) {
-    if (advanceCompletedQuestionIfNeeded(container)) {
+  try {
+    if (pendingQuestionId) {
+      console.info(LOG_PREFIX, "Waiting for response", pendingQuestionId);
       return;
     }
 
-    const qData = parseQuestion();
-    if (qData) {
-      const questionId = createQuestionId();
-      qData.questionId = questionId;
-      pendingQuestionId = questionId;
-      console.info(LOG_PREFIX, "Dispatching question", questionId);
-
-      chrome.runtime.sendMessage({
-        type: "sendQuestionToChatGPT",
-        question: qData,
-        questionId,
-      });
-    } else {
-      setTimeout(() => {
-        if (isAutomating && !pendingQuestionId) {
-          checkForNextStep();
-        }
-      }, 700);
+    if (handleTopicOverview()) {
+      return;
     }
+
+    if (handleForcedLearning()) {
+      return;
+    }
+
+    const container = document.querySelector(".probe-container");
+    if (container && !container.querySelector(".forced-learning")) {
+      if (advanceCompletedQuestionIfNeeded(container)) {
+        return;
+      }
+
+      const qData = parseQuestion();
+      if (qData) {
+        const questionId = createQuestionId();
+        qData.questionId = questionId;
+        pendingQuestionId = questionId;
+        markQuestionPerf(questionId, "dispatchedAt");
+        console.info(LOG_PREFIX, "Dispatching question", questionId);
+
+        if (pendingAdvancePerf?.nextClickedAt) {
+          logPerf(
+            `${pendingAdvancePerf.questionId || "unknown"} next->nextDispatch ${
+              Date.now() - pendingAdvancePerf.nextClickedAt
+            }ms`
+          );
+          clearQuestionPerf(pendingAdvancePerf.questionId);
+          pendingAdvancePerf = null;
+        }
+
+        chrome.runtime.sendMessage({
+          type: "sendQuestionToChatGPT",
+          question: qData,
+          questionId,
+        });
+      } else {
+        scheduleCheckForNextStep(
+          NEXT_STEP_RETRY_DELAY_MS,
+          "question_not_ready_retry"
+        );
+      }
+      return;
+    }
+
+    scheduleCheckForNextStep(NEXT_STEP_RETRY_DELAY_MS, "probe_container_absent");
+  } finally {
+    isCheckingNextStep = false;
   }
 }
 
@@ -1870,8 +2051,12 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
       return;
     }
 
+    const activeQuestionId = responseQuestionId || pendingQuestionId || null;
     if (pendingQuestionId) {
       console.info(LOG_PREFIX, "Processing response", pendingQuestionId);
+    }
+    if (activeQuestionId) {
+      markQuestionPerf(activeQuestionId, "responseReceivedAt");
     }
     pendingQuestionId = null;
 
@@ -1978,49 +2163,108 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
       });
     }
 
+    if (activeQuestionId) {
+      const perfEntry = markQuestionPerf(activeQuestionId, "answerAppliedAt");
+      if (perfEntry?.responseReceivedAt) {
+        logPerf(
+          `${activeQuestionId} aiResponse->answerApplied ${
+            perfEntry.answerAppliedAt - perfEntry.responseReceivedAt
+          }ms`
+        );
+      }
+    }
+
     if (isAutomating) {
-      waitForElement(
-        '[data-automation-id="confidence-buttons--high_confidence"]:not([disabled])',
-        10000
-      )
-        .then((button) => {
-          button.click();
+      try {
+        const confidenceButton = await waitForEnabledElement(
+          '[data-automation-id="confidence-buttons--high_confidence"]',
+          10000
+        );
+        confidenceButton.click();
+        const confidenceClickedAt = Date.now();
 
-          setTimeout(() => {
-            const incorrectMarker = container.querySelector(
-              ".awd-probe-correctness.incorrect"
+        if (activeQuestionId) {
+          const perfEntry = markQuestionPerf(
+            activeQuestionId,
+            "confidenceClickedAt",
+            confidenceClickedAt
+          );
+          if (perfEntry?.answerAppliedAt) {
+            logPerf(
+              `${activeQuestionId} answerApplied->confidence ${
+                confidenceClickedAt - perfEntry.answerAppliedAt
+              }ms`
             );
-            if (incorrectMarker) {
-              const correctionData = extractCorrectAnswer();
-              if (correctionData && correctionData.answer) {
-                lastIncorrectQuestion = correctionData.question;
-                lastCorrectAnswer = cleanAnswer(correctionData.answer);
-                console.log(
-                  "Found incorrect answer. Correct answer is:",
-                  lastCorrectAnswer
-                );
-              }
-            }
+          }
+        }
 
-            waitForElement(".next-button", 10000)
-              .then((nextButton) => {
-                nextButton.click();
-                setTimeout(() => {
-                  checkForNextStep();
-                }, 1000);
-              })
-              .catch((error) => {
-                console.error("Automation error:", error);
-                isAutomating = false;
-                clearMatchingPauseWatcher();
-              });
-          }, 1000);
-        })
-        .catch((error) => {
-          console.error("Automation error:", error);
-          isAutomating = false;
-          clearMatchingPauseWatcher();
-        });
+        try {
+          await waitForCondition(() => {
+            const liveContainer = document.querySelector(".probe-container");
+            if (!liveContainer) return false;
+
+            const hasCorrectness = Boolean(
+              liveContainer.querySelector(
+                ".awd-probe-correctness.correct, .awd-probe-correctness.incorrect, .correct-answer-container"
+              )
+            );
+            const nextButton = getNextButton();
+            if (hasCorrectness) return true;
+            return nextButton && !isElementDisabled(nextButton);
+          }, 6000);
+        } catch (error) {}
+
+        const latestContainer = document.querySelector(".probe-container") || container;
+        const incorrectMarker = latestContainer.querySelector(
+          ".awd-probe-correctness.incorrect"
+        );
+        if (incorrectMarker) {
+          const correctionData = extractCorrectAnswer();
+          if (correctionData && correctionData.answer) {
+            lastIncorrectQuestion = correctionData.question;
+            lastCorrectAnswer = cleanAnswer(correctionData.answer);
+            console.log(
+              "Found incorrect answer. Correct answer is:",
+              lastCorrectAnswer
+            );
+          }
+        }
+
+        const transitionSnapshot = getQuestionTransitionSnapshot(latestContainer);
+        const nextButton = await waitForEnabledElement(".next-button", 10000);
+        nextButton.click();
+        const nextClickedAt = Date.now();
+
+        if (activeQuestionId) {
+          const perfEntry = markQuestionPerf(
+            activeQuestionId,
+            "nextClickedAt",
+            nextClickedAt
+          );
+          if (perfEntry?.confidenceClickedAt) {
+            logPerf(
+              `${activeQuestionId} confidence->next ${
+                nextClickedAt - perfEntry.confidenceClickedAt
+              }ms`
+            );
+          }
+          pendingAdvancePerf = {
+            questionId: activeQuestionId,
+            nextClickedAt,
+          };
+        }
+
+        await waitForQuestionTransition(
+          transitionSnapshot,
+          QUESTION_TRANSITION_TIMEOUT_MS
+        );
+        scheduleCheckForNextStep(0, "post_answer_next");
+      } catch (error) {
+        console.error("Automation error:", error);
+        isAutomating = false;
+        clearAutomationRuntimeState();
+        clearMatchingPauseWatcher();
+      }
     }
   } catch (e) {
     console.error("Error processing response:", e);
@@ -2034,9 +2278,7 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
     }
 
     if (isAutomating) {
-      setTimeout(() => {
-        checkForNextStep();
-      }, 750);
+      scheduleCheckForNextStep(NEXT_STEP_RETRY_DELAY_MS, "response_parse_retry");
     }
   }
 }
@@ -2065,7 +2307,7 @@ function addAssistantButton() {
       btn.addEventListener("click", () => {
         if (isAutomating) {
           isAutomating = false;
-          pendingQuestionId = null;
+          clearAutomationRuntimeState();
           lastResponseFormatIssue = null;
           clearMatchingPauseWatcher();
           chrome.storage.sync.get("aiModel", function (data) {
@@ -2088,9 +2330,11 @@ function addAssistantButton() {
             isAutomating = true;
             pendingQuestionId = null;
             lastResponseFormatIssue = null;
+            pendingAdvancePerf = null;
+            questionPerfMarks.clear();
             clearMatchingPauseWatcher();
             btn.textContent = "Stop Automation";
-            checkForNextStep();
+            scheduleCheckForNextStep(0, "manual_start");
           }
         }
       });
@@ -2226,7 +2470,7 @@ function waitForElement(selector, timeout = 5000) {
         clearInterval(interval);
         reject(new Error("Element not found: " + selector));
       }
-    }, 100);
+    }, READINESS_POLL_INTERVAL_MS);
   });
 }
 
@@ -2234,7 +2478,5 @@ setupMessageListener();
 addAssistantButton();
 
 if (isAutomating) {
-  setTimeout(() => {
-    checkForNextStep();
-  }, 1000);
+  scheduleCheckForNextStep(NEXT_STEP_RETRY_DELAY_MS, "script_bootstrap");
 }

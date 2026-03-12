@@ -11,9 +11,14 @@ let responseCandidateKey = "";
 let responseCandidateFirstSeenAt = 0;
 const INPUT_WAIT_TIMEOUT_MS = 15000;
 const SEND_BUTTON_WAIT_TIMEOUT_MS = 7000;
-const RESPONSE_STABILITY_WINDOW_MS = 2200;
+const INPUT_POLL_INTERVAL_MS = 80;
+const SEND_BUTTON_POLL_INTERVAL_MS = 70;
+const RESPONSE_STABILITY_WINDOW_IDLE_MS = 500;
+const RESPONSE_STABILITY_WINDOW_GENERATING_MS = 1700;
 const GENERATION_GUARD_MAX_WAIT_MS = 12000;
+const RESPONSE_CHECK_INTERVAL_MS = 300;
 const LOG_PREFIX = "[Auto-McGraw][deepseek]";
+const PERF_LOGGING_ENABLED = true;
 const MESSAGE_SELECTORS = [
   "[data-testid='chat-message-assistant']",
   "[data-testid='message-content']",
@@ -42,6 +47,11 @@ const STOP_BUTTON_SELECTORS = [
   '[data-testid="stop-button"]',
   '[aria-label*="Stop generating"]',
 ];
+
+function logPerf(message, ...args) {
+  if (!PERF_LOGGING_ENABLED) return;
+  console.info(LOG_PREFIX, "[perf]", message, ...args);
+}
 
 function isElementVisible(element) {
   if (!element || !element.isConnected) {
@@ -198,7 +208,7 @@ function waitForChatInput(timeoutMs = INPUT_WAIT_TIMEOUT_MS) {
         return;
       }
 
-      setTimeout(attempt, 150);
+      setTimeout(attempt, INPUT_POLL_INTERVAL_MS);
     };
 
     attempt();
@@ -221,15 +231,11 @@ function waitForSendButton(timeoutMs = SEND_BUTTON_WAIT_TIMEOUT_MS) {
         return;
       }
 
-      setTimeout(attempt, 120);
+      setTimeout(attempt, SEND_BUTTON_POLL_INTERVAL_MS);
     };
 
     attempt();
   });
-}
-
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function updateChatInputValue(chatInput, text) {
@@ -337,6 +343,7 @@ function isLikelyStillGenerating(messageNode = null) {
 }
 
 async function insertQuestion(questionData) {
+  const insertStartAt = Date.now();
   const { type, question, options, previousCorrection, previousFormatIssue } =
     questionData;
   let text = `Type: ${type}\nQuestion: ${question}`;
@@ -390,7 +397,6 @@ async function insertQuestion(questionData) {
     '\n\nRespond with ONLY a valid JSON object with keys "answer" and "explanation". The "answer" field is required. Do not wrap the JSON in markdown or code fences. Escape any internal double quotes in strings (for example: \\"text\\"). Explanations should be no more than one sentence. DO NOT acknowledge corrections or format reminders; only answer the current question.';
 
   const chatInput = await waitForChatInput();
-  await delay(250);
 
   if (!updateChatInputValue(chatInput, text)) {
     throw new Error("Unable to fill input area");
@@ -398,6 +404,11 @@ async function insertQuestion(questionData) {
 
   const sendButton = await waitForSendButton();
   sendButton.click();
+  logPerf(
+    `${activeQuestionId || "unknown"} promptReady->sendClicked ${
+      Date.now() - insertStartAt
+    }ms`
+  );
   startObserving();
 }
 
@@ -501,6 +512,21 @@ function parseAiResponse(responseText) {
   };
 }
 
+function isLikelyCompleteJsonPayload(responseText) {
+  if (typeof responseText !== "string") return false;
+
+  const cleanedText = stripCodeFences(responseText)
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\n\s*/g, " ")
+    .trim();
+
+  return (
+    cleanedText.startsWith("{") &&
+    cleanedText.endsWith("}") &&
+    cleanedText.includes('"answer"')
+  );
+}
+
 function processResponse(responseText, sourceMessage = null) {
   if (hasResponded || responseForwardingInProgress) {
     return false;
@@ -519,19 +545,29 @@ function processResponse(responseText, sourceMessage = null) {
     return false;
   }
 
-  if (now - responseCandidateFirstSeenAt < RESPONSE_STABILITY_WINDOW_MS) {
+  const candidateAgeMs = now - responseCandidateFirstSeenAt;
+  const stillGenerating = isLikelyStillGenerating(sourceMessage);
+  const stabilityWindowMs = stillGenerating
+    ? RESPONSE_STABILITY_WINDOW_GENERATING_MS
+    : RESPONSE_STABILITY_WINDOW_IDLE_MS;
+
+  if (candidateAgeMs < stabilityWindowMs) {
     return false;
   }
 
-  if (
-    isLikelyStillGenerating(sourceMessage) &&
-    now - responseCandidateFirstSeenAt < GENERATION_GUARD_MAX_WAIT_MS
-  ) {
-    return false;
+  if (stillGenerating) {
+    const hasCompleteJsonShape = isLikelyCompleteJsonPayload(responseText);
+    if (!hasCompleteJsonShape && candidateAgeMs < GENERATION_GUARD_MAX_WAIT_MS) {
+      return false;
+    }
   }
 
   responseForwardingInProgress = true;
   console.info(LOG_PREFIX, "Sending response", activeQuestionId);
+  logPerf(
+    `${activeQuestionId || "unknown"} responseStable->forward ${candidateAgeMs}ms`,
+    { stillGenerating }
+  );
 
   chrome.runtime
     .sendMessage({
@@ -659,5 +695,5 @@ function startObserving() {
     attributes: true,
   });
 
-  checkIntervalId = setInterval(checkForResponse, 1000);
+  checkIntervalId = setInterval(checkForResponse, RESPONSE_CHECK_INTERVAL_MS);
 }

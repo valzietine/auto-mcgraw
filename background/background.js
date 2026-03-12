@@ -7,6 +7,7 @@ let aiWindowId = null;
 let pendingAiRequest = null;
 
 const LOG_PREFIX = "[Auto-McGraw][bg]";
+const PERF_LOGGING_ENABLED = true;
 const AI_RESPONSE_TIMEOUT_MS = 45000;
 const AI_TIMEOUT_RETRY_LIMIT = 1;
 const AI_RESPONSE_TIMEOUT_BY_TYPE_MS = {
@@ -28,6 +29,9 @@ const DEEPSEEK_URL_PATTERNS = [
   "https://chat.deepseek.com/*",
   "https://deepseek.chat/*",
 ];
+const MESSAGE_RETRY_DELAY_MS = 250;
+const AI_QUESTION_RETRY_DELAYS_MS = [140, 260, 520];
+const AI_SCRIPT_INJECTION_SETTLE_MS = 90;
 
 function logInfo(...args) {
   console.info(LOG_PREFIX, ...args);
@@ -35,6 +39,11 @@ function logInfo(...args) {
 
 function logWarn(...args) {
   console.warn(LOG_PREFIX, ...args);
+}
+
+function logPerf(message, ...args) {
+  if (!PERF_LOGGING_ENABLED) return;
+  logInfo("[perf]", message, ...args);
 }
 
 function isDeepSeekTabUrl(url = "") {
@@ -93,7 +102,12 @@ function clearPendingAiRequest(reason = "") {
   pendingAiRequest = null;
 }
 
-function sendMessageWithRetry(tabId, message, maxAttempts = 3, delay = 1000) {
+function sendMessageWithRetry(
+  tabId,
+  message,
+  maxAttempts = 3,
+  delay = MESSAGE_RETRY_DELAY_MS
+) {
   return new Promise((resolve, reject) => {
     let attempts = 0;
 
@@ -130,6 +144,18 @@ function isMissingReceiverError(error) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getQuestionRetryDelayMs(attemptNumber) {
+  if (!AI_QUESTION_RETRY_DELAYS_MS.length) {
+    return 0;
+  }
+
+  const index = Math.min(
+    Math.max(attemptNumber - 1, 0),
+    AI_QUESTION_RETRY_DELAYS_MS.length - 1
+  );
+  return AI_QUESTION_RETRY_DELAYS_MS[index];
 }
 
 function pickPreferredTab(tabs, preferredHosts = []) {
@@ -175,13 +201,14 @@ async function injectAiContentScript(tabId) {
 
 async function sendQuestionToAiWithRetry(
   questionPayload,
-  maxAttempts = 4,
-  delay = 900
+  maxAttempts = 4
 ) {
   let lastErrorMessage = "AI tab did not accept the question.";
   const questionId = questionPayload?.questionId || "unknown";
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let shouldRefreshTabs = false;
+
     try {
       logInfo(`Sending question ${questionId} to ${aiType} (attempt ${attempt})`);
       const response = await sendMessageWithRetry(
@@ -214,20 +241,27 @@ async function sendQuestionToAiWithRetry(
             `Missing receiver for ${questionId}; injecting ${aiType} script and retrying`
           );
           await injectAiContentScript(aiTabId);
-          await sleep(250);
+          await sleep(AI_SCRIPT_INJECTION_SETTLE_MS);
         } catch (injectError) {
           lastErrorMessage = `Receiver missing and script injection failed: ${getErrorMessage(
             injectError
           )}`;
+          shouldRefreshTabs = true;
         }
       } else if (lastErrorMessage.includes("No tab with id")) {
-        await findAndStoreTabs();
+        shouldRefreshTabs = true;
       }
     }
 
     if (attempt < maxAttempts) {
-      await sleep(delay);
-      await findAndStoreTabs();
+      const retryDelay = getQuestionRetryDelayMs(attempt);
+      if (retryDelay > 0) {
+        await sleep(retryDelay);
+      }
+
+      if (shouldRefreshTabs) {
+        await findAndStoreTabs();
+      }
     }
   }
 
@@ -362,9 +396,7 @@ async function triggerAiTimeoutRetry(expectedQuestionId) {
   try {
     await findAndStoreTabs();
     const focusedAi = await focusTab(aiTabId);
-    if (focusedAi) {
-      await sleep(300);
-    } else {
+    if (!focusedAi) {
       logWarn(`Could not focus AI tab ${aiTabId} during retry`);
     }
 
@@ -413,6 +445,7 @@ async function processQuestion(message) {
   processingQuestion = true;
 
   try {
+    const dispatchStartAt = Date.now();
     await findAndStoreTabs();
 
     if (!aiTabId) {
@@ -440,13 +473,15 @@ async function processQuestion(message) {
     }
 
     const focusedAi = await focusTab(aiTabId);
-    if (focusedAi) {
-      await sleep(300);
-    } else {
+    if (!focusedAi) {
       logWarn(`Could not focus AI tab ${aiTabId}; sending question in background`);
     }
 
     await sendQuestionToAiWithRetry(questionPayload);
+    const aiAcceptedAt = Date.now();
+    logPerf(
+      `${questionId} dispatch->aiAccepted ${aiAcceptedAt - dispatchStartAt}ms (${aiType})`
+    );
 
     pendingAiRequest = {
       questionId,
@@ -455,6 +490,8 @@ async function processQuestion(message) {
       aiType,
       retryCount: 0,
       createdAt: Date.now(),
+      dispatchStartAt,
+      aiAcceptedAt,
       timeoutId: null,
     };
     scheduleAiRequestWatchdog(questionId);
@@ -468,7 +505,9 @@ async function processQuestion(message) {
 
 async function processResponse(message) {
   try {
+    const responseReceivedAt = Date.now();
     const responseQuestionId = message.questionId || null;
+    const activeQuestionId = responseQuestionId || pendingAiRequest?.questionId || null;
 
     if (responseQuestionId && hasCompletedQuestionId(responseQuestionId)) {
       logWarn(`Ignoring duplicate completed response for ${responseQuestionId}`);
@@ -484,6 +523,14 @@ async function processResponse(message) {
         );
         return;
       }
+    }
+
+    if (pendingAiRequest?.aiAcceptedAt && activeQuestionId) {
+      logPerf(
+        `${activeQuestionId} aiAccepted->aiResponseReceived ${
+          responseReceivedAt - pendingAiRequest.aiAcceptedAt
+        }ms`
+      );
     }
 
     if (!mheTabId) {
@@ -506,9 +553,7 @@ async function processResponse(message) {
     }
 
     const focusedMhe = await focusTab(mheTabId);
-    if (focusedMhe) {
-      await sleep(300);
-    } else {
+    if (!focusedMhe) {
       logWarn(`Could not focus MHE tab ${mheTabId}; sending response in background`);
     }
 
@@ -517,6 +562,13 @@ async function processResponse(message) {
       response: message.response,
       questionId: responseQuestionId || pendingAiRequest?.questionId || null,
     });
+    if (activeQuestionId) {
+      logPerf(
+        `${activeQuestionId} aiResponseReceived->mheDelivered ${
+          Date.now() - responseReceivedAt
+        }ms`
+      );
+    }
 
     const completedId = responseQuestionId || pendingAiRequest?.questionId;
     cacheCompletedQuestionId(completedId);
