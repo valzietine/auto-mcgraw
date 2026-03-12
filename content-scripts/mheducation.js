@@ -2,6 +2,7 @@ let messageListener = null;
 let isAutomating = false;
 let lastIncorrectQuestion = null;
 let lastCorrectAnswer = null;
+let matchingPauseIntervalId = null;
 
 function setupMessageListener() {
   if (messageListener) {
@@ -47,6 +48,62 @@ function handleTopicOverview() {
   return false;
 }
 
+function clearMatchingPauseWatcher() {
+  if (matchingPauseIntervalId !== null) {
+    clearInterval(matchingPauseIntervalId);
+    matchingPauseIntervalId = null;
+  }
+}
+
+function getQuestionSignature(container) {
+  if (!container) return "";
+
+  const questionType = detectQuestionType(container);
+  if (questionType === "matching") {
+    const promptText =
+      container.querySelector(".prompt")?.textContent?.trim() || "";
+    const prompts = Array.from(
+      container.querySelectorAll(".match-prompt .content")
+    )
+      .map((el) => normalizeChoiceText(el.textContent))
+      .filter(Boolean)
+      .join("|");
+
+    return `${questionType}::${normalizeChoiceText(promptText)}::${prompts}`;
+  }
+
+  const promptText = container.querySelector(".prompt")?.textContent?.trim() || "";
+
+  return `${questionType}::${normalizeChoiceText(promptText)}`;
+}
+
+function pauseForManualMatchingAndResume(questionSignature) {
+  if (!questionSignature) return;
+
+  clearMatchingPauseWatcher();
+
+  matchingPauseIntervalId = setInterval(() => {
+    if (!isAutomating) {
+      clearMatchingPauseWatcher();
+      return;
+    }
+
+    const currentContainer = document.querySelector(".probe-container");
+    if (!currentContainer) return;
+
+    const currentSignature = getQuestionSignature(currentContainer);
+    if (currentSignature && currentSignature !== questionSignature) {
+      clearMatchingPauseWatcher();
+
+      setTimeout(() => {
+        if (isAutomating) {
+          checkForNextStep();
+        }
+      }, 500);
+    }
+  }, 400);
+}
+
 function handleForcedLearning() {
   const forcedLearningAlert = document.querySelector(
     ".forced-learning .alert-error"
@@ -74,6 +131,7 @@ function handleForcedLearning() {
         .catch((error) => {
           console.error("Error in forced learning flow:", error);
           isAutomating = false;
+          clearMatchingPauseWatcher();
         });
       return true;
     }
@@ -353,11 +411,19 @@ function processChatGPTResponse(responseText) {
     lastCorrectAnswer = null;
 
     if (container.querySelector(".awd-probe-type-matching")) {
+      const questionSignature = getQuestionSignature(container);
+
       alert(
         "Matching Question Solution:\n\n" +
           answers.join("\n") +
-          "\n\nPlease input these matches manually, then click high confidence and next."
+          "\n\nPlease input these matches manually, then click high confidence and next. Automation will resume after you move to the next question."
       );
+
+      if (isAutomating) {
+        pauseForManualMatchingAndResume(questionSignature);
+      }
+
+      return;
     } else if (container.querySelector(".awd-probe-type-fill_in_the_blank")) {
       const inputs = container.querySelectorAll("input.fitb-input");
       inputs.forEach((input, index) => {
@@ -441,12 +507,14 @@ function processChatGPTResponse(responseText) {
               .catch((error) => {
                 console.error("Automation error:", error);
                 isAutomating = false;
+                clearMatchingPauseWatcher();
               });
           }, 1000);
         })
         .catch((error) => {
           console.error("Automation error:", error);
           isAutomating = false;
+          clearMatchingPauseWatcher();
         });
     }
   } catch (e) {
@@ -478,6 +546,7 @@ function addAssistantButton() {
       btn.addEventListener("click", () => {
         if (isAutomating) {
           isAutomating = false;
+          clearMatchingPauseWatcher();
           chrome.storage.sync.get("aiModel", function (data) {
             const currentModel = data.aiModel || "chatgpt";
             let currentModelName = "ChatGPT";
@@ -496,6 +565,7 @@ function addAssistantButton() {
           );
           if (proceed) {
             isAutomating = true;
+            clearMatchingPauseWatcher();
             btn.textContent = "Stop Automation";
             checkForNextStep();
           }
