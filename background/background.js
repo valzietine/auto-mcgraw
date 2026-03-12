@@ -5,6 +5,13 @@ let lastActiveTabId = null;
 let processingQuestion = false;
 let mheWindowId = null;
 let aiWindowId = null;
+
+const AI_CONTENT_SCRIPT_FILES = {
+  chatgpt: "content-scripts/chatgpt.js",
+  gemini: "content-scripts/gemini.js",
+  deepseek: "content-scripts/deepseek.js",
+};
+
 const DEEPSEEK_URL_PATTERNS = [
   "https://chat.deepseek.com/*",
   "https://deepseek.chat/*",
@@ -41,19 +48,77 @@ function sendMessageWithRetry(tabId, message, maxAttempts = 3, delay = 1000) {
   });
 }
 
+function getErrorMessage(error) {
+  return error?.message || String(error || "");
+}
+
+function isMissingReceiverError(error) {
+  const message = getErrorMessage(error);
+  return (
+    message.includes("Receiving end does not exist") ||
+    message.includes("Could not establish connection")
+  );
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function sendQuestionToAiWithRetry(question, maxAttempts = 3, delay = 900) {
+function pickPreferredTab(tabs, preferredHosts = []) {
+  if (!tabs?.length) {
+    return null;
+  }
+
+  if (aiTabId) {
+    const existingTab = tabs.find((tab) => tab.id === aiTabId);
+    if (existingTab) {
+      return existingTab;
+    }
+  }
+
+  const activeTab = tabs.find((tab) => tab.active);
+  if (activeTab) {
+    return activeTab;
+  }
+
+  for (const host of preferredHosts) {
+    const hostMatch = tabs.find((tab) => tab.url && tab.url.includes(host));
+    if (hostMatch) {
+      return hostMatch;
+    }
+  }
+
+  return tabs
+    .slice()
+    .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
+}
+
+async function injectAiContentScript(tabId) {
+  const scriptFile = AI_CONTENT_SCRIPT_FILES[aiType];
+  if (!scriptFile) {
+    throw new Error(`No content script configured for "${aiType}".`);
+  }
+
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: [scriptFile],
+  });
+}
+
+async function sendQuestionToAiWithRetry(question, maxAttempts = 4, delay = 900) {
   let lastErrorMessage = "AI tab did not accept the question.";
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const response = await sendMessageWithRetry(aiTabId, {
-        type: "receiveQuestion",
-        question,
-      });
+      const response = await sendMessageWithRetry(
+        aiTabId,
+        {
+          type: "receiveQuestion",
+          question,
+        },
+        1,
+        0
+      );
 
       if (response && response.received) {
         return response;
@@ -61,13 +126,29 @@ async function sendQuestionToAiWithRetry(question, maxAttempts = 3, delay = 900)
 
       if (response && response.error) {
         lastErrorMessage = response.error;
+      } else if (!response) {
+        lastErrorMessage = "AI tab did not return acknowledgement.";
       }
     } catch (error) {
-      lastErrorMessage = error?.message || String(error);
+      lastErrorMessage = getErrorMessage(error);
+
+      if (isMissingReceiverError(error) && aiTabId) {
+        try {
+          await injectAiContentScript(aiTabId);
+          await sleep(250);
+        } catch (injectError) {
+          lastErrorMessage = `Receiver missing and script injection failed: ${getErrorMessage(
+            injectError
+          )}`;
+        }
+      } else if (lastErrorMessage.includes("No tab with id")) {
+        await findAndStoreTabs();
+      }
     }
 
     if (attempt < maxAttempts) {
       await sleep(delay);
+      await findAndStoreTabs();
     }
   }
 
@@ -100,9 +181,17 @@ async function findAndStoreTabs() {
       "https://ezto.mheducation.com/*",
     ],
   });
+
   if (mheTabs.length > 0) {
-    mheTabId = mheTabs[0].id;
-    mheWindowId = mheTabs[0].windowId;
+    const preferredMheTab =
+      mheTabs.find((tab) => tab.id === mheTabId) ||
+      mheTabs.find((tab) => tab.active) ||
+      mheTabs[0];
+    mheTabId = preferredMheTab.id;
+    mheWindowId = preferredMheTab.windowId;
+  } else {
+    mheTabId = null;
+    mheWindowId = null;
   }
 
   const data = await chrome.storage.sync.get("aiModel");
@@ -112,28 +201,39 @@ async function findAndStoreTabs() {
   if (aiModel === "chatgpt") {
     const tabs = await chrome.tabs.query({ url: "https://chatgpt.com/*" });
     if (tabs.length > 0) {
-      aiTabId = tabs[0].id;
-      aiWindowId = tabs[0].windowId;
+      const preferredTab = pickPreferredTab(tabs, ["chatgpt.com"]);
+      aiTabId = preferredTab.id;
+      aiWindowId = preferredTab.windowId;
+    } else {
+      aiTabId = null;
+      aiWindowId = null;
     }
   } else if (aiModel === "gemini") {
     const tabs = await chrome.tabs.query({
       url: "https://gemini.google.com/*",
     });
     if (tabs.length > 0) {
-      aiTabId = tabs[0].id;
-      aiWindowId = tabs[0].windowId;
+      const preferredTab = pickPreferredTab(tabs, ["gemini.google.com"]);
+      aiTabId = preferredTab.id;
+      aiWindowId = preferredTab.windowId;
+    } else {
+      aiTabId = null;
+      aiWindowId = null;
     }
   } else if (aiModel === "deepseek") {
     const tabs = await chrome.tabs.query({
       url: DEEPSEEK_URL_PATTERNS,
     });
     if (tabs.length > 0) {
-      const preferredTab =
-        tabs.find((tab) => tab.url && tab.url.includes("chat.deepseek.com")) ||
-        tabs.find((tab) => tab.url && tab.url.includes("deepseek.chat")) ||
-        tabs[0];
+      const preferredTab = pickPreferredTab(tabs, [
+        "chat.deepseek.com",
+        "deepseek.chat",
+      ]);
       aiTabId = preferredTab.id;
       aiWindowId = preferredTab.windowId;
+    } else {
+      aiTabId = null;
+      aiWindowId = null;
     }
   }
 }
@@ -166,7 +266,7 @@ async function processQuestion(message) {
 
     if (sameWindow) {
       await focusTab(aiTabId);
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await sleep(300);
     }
 
     await sendQuestionToAiWithRetry(message.question);
@@ -180,7 +280,7 @@ async function processQuestion(message) {
     if (mheTabId) {
       await sendMessageWithRetry(mheTabId, {
         type: "alertMessage",
-        message: `Error communicating with ${aiType}: ${error?.message || "Unknown error"}`,
+        message: `Error communicating with ${aiType}: ${getErrorMessage(error)}`,
       });
     }
   } finally {
@@ -198,8 +298,12 @@ async function processResponse(message) {
         ],
       });
       if (mheTabs.length > 0) {
-        mheTabId = mheTabs[0].id;
-        mheWindowId = mheTabs[0].windowId;
+        const preferredMheTab =
+          mheTabs.find((tab) => tab.id === mheTabId) ||
+          mheTabs.find((tab) => tab.active) ||
+          mheTabs[0];
+        mheTabId = preferredMheTab.id;
+        mheWindowId = preferredMheTab.windowId;
       } else {
         return;
       }
@@ -209,7 +313,7 @@ async function processResponse(message) {
 
     if (sameWindow) {
       await focusTab(mheTabId);
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await sleep(300);
     }
 
     await sendMessageWithRetry(mheTabId, {
