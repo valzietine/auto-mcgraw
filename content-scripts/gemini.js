@@ -76,6 +76,13 @@ async function insertQuestion(questionData) {
   } else if (type === "fill_in_the_blank") {
     text +=
       "\n\nThis is a fill in the blank question. If there are multiple blanks, provide answers as an array in order of appearance. For a single blank, you can provide a string.";
+  } else if (type === "ordering") {
+    if (options && options.length > 0) {
+      text +=
+        "\nOptions:\n" + options.map((opt, i) => `${i + 1}. ${opt}`).join("\n");
+    }
+    text +=
+      '\n\nThis is an ordering question. Set "answer" to an array containing the options in correct top-to-bottom order. Include each option exactly once and use the exact option text.';
   } else if (options && options.length > 0) {
     text +=
       "\nOptions:\n" + options.map((opt, i) => `${i + 1}. ${opt}`).join("\n");

@@ -505,6 +505,13 @@ async function processResponse(message) {
       }
     }
 
+    const focusedMhe = await focusTab(mheTabId);
+    if (focusedMhe) {
+      await sleep(300);
+    } else {
+      logWarn(`Could not focus MHE tab ${mheTabId}; sending response in background`);
+    }
+
     await sendMessageWithRetry(mheTabId, {
       type: "processChatGPTResponse",
       response: message.response,
