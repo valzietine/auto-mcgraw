@@ -16,6 +16,33 @@
 
 ---
 
+## Fork Notice (`dev` branch)
+
+This repository is a **fork** of the original Auto-McGraw project by `GooglyBlox`.
+The sections below keep the original usage documentation, and this section tracks fork-specific changes merged into `dev`.
+
+### Changes merged from `pr/deepseek-fix`
+
+- Fixed DeepSeek tab discovery and message routing so both `chat.deepseek.com` and `deepseek.chat` are handled more reliably.
+- Improved DeepSeek content script selectors for:
+  - assistant response detection
+  - chat input detection
+  - send button detection
+- Improved settings/background detection for DeepSeek availability checks.
+- Added `https://chat.deepseek.com/*` to extension host permissions.
+
+### Changes merged from `quizzes`
+
+- Added quiz support for `https://ezto.mheducation.com/*`.
+- Added a dedicated quiz automation content script: `content-scripts/ezto-mheducation.js`.
+- Updated background tab detection and tab focus logic to work with both:
+  - `learning.mheducation.com`
+  - `ezto.mheducation.com`
+- Updated manifest entries for the new quiz domain/content script and `api.github.com` host access.
+- Extension manifest version in this branch is `2.0`.
+
+---
+
 ## Compatibility Notice
 
 **⚠️ MacOS Users:** This extension may not work properly on MacOS due to platform-specific differences in Chrome extension behavior and system interactions. For the best experience, we recommend using this extension on Windows or Linux systems.
