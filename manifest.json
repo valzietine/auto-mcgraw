@@ -41,7 +41,10 @@
       "js": ["content-scripts/gemini.js"]
     },
     {
-      "matches": ["https://chat.deepseek.com/*"],
+      "matches": [
+        "https://chat.deepseek.com/*",
+        "https://deepseek.chat/*"
+      ],
       "js": ["content-scripts/deepseek.js"]
     }
   ],

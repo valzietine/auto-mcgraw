@@ -7,6 +7,7 @@ let mheWindowId = null;
 let aiWindowId = null;
 const DEEPSEEK_URL_PATTERNS = [
   "https://chat.deepseek.com/*",
+  "https://deepseek.chat/*",
 ];
 
 function isDeepSeekTabUrl(url = "") {
@@ -38,6 +39,39 @@ function sendMessageWithRetry(tabId, message, maxAttempts = 3, delay = 1000) {
 
     attemptSend();
   });
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function sendQuestionToAiWithRetry(question, maxAttempts = 3, delay = 900) {
+  let lastErrorMessage = "AI tab did not accept the question.";
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await sendMessageWithRetry(aiTabId, {
+        type: "receiveQuestion",
+        question,
+      });
+
+      if (response && response.received) {
+        return response;
+      }
+
+      if (response && response.error) {
+        lastErrorMessage = response.error;
+      }
+    } catch (error) {
+      lastErrorMessage = error?.message || String(error);
+    }
+
+    if (attempt < maxAttempts) {
+      await sleep(delay);
+    }
+  }
+
+  throw new Error(lastErrorMessage);
 }
 
 async function focusTab(tabId) {
@@ -96,6 +130,7 @@ async function findAndStoreTabs() {
     if (tabs.length > 0) {
       const preferredTab =
         tabs.find((tab) => tab.url && tab.url.includes("chat.deepseek.com")) ||
+        tabs.find((tab) => tab.url && tab.url.includes("deepseek.chat")) ||
         tabs[0];
       aiTabId = preferredTab.id;
       aiWindowId = preferredTab.windowId;
@@ -120,7 +155,6 @@ async function processQuestion(message) {
         type: "alertMessage",
         message: `Please open ${aiType} in another tab before using automation.`,
       });
-      processingQuestion = false;
       return;
     }
 
@@ -135,10 +169,7 @@ async function processQuestion(message) {
       await new Promise((resolve) => setTimeout(resolve, 300));
     }
 
-    await sendMessageWithRetry(aiTabId, {
-      type: "receiveQuestion",
-      question: message.question,
-    });
+    await sendQuestionToAiWithRetry(message.question);
 
     if (sameWindow && lastActiveTabId && lastActiveTabId !== aiTabId) {
       setTimeout(async () => {
@@ -149,7 +180,7 @@ async function processQuestion(message) {
     if (mheTabId) {
       await sendMessageWithRetry(mheTabId, {
         type: "alertMessage",
-        message: `Error communicating with ${aiType}. Please make sure it's open in another tab.`,
+        message: `Error communicating with ${aiType}: ${error?.message || "Unknown error"}`,
       });
     }
   } finally {

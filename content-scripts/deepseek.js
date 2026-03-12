@@ -4,6 +4,9 @@ let observationStartTime = 0;
 let observationTimeout = null;
 let checkIntervalId = null;
 let observer = null;
+let baselineMessageSignatures = new Map();
+const INPUT_WAIT_TIMEOUT_MS = 15000;
+const SEND_BUTTON_WAIT_TIMEOUT_MS = 7000;
 const MESSAGE_SELECTORS = [
   "[data-testid='chat-message-assistant']",
   "[data-testid='message-content']",
@@ -26,14 +29,33 @@ const SEND_BUTTON_SELECTORS = [
   'button[type="submit"]',
   '[aria-label="Send message"]',
   '[aria-label*="Send"]',
-  ".bf38813a button",
 ];
+
+function isElementVisible(element) {
+  if (!element || !element.isConnected) {
+    return false;
+  }
+
+  const style = window.getComputedStyle(element);
+  if (
+    style.display === "none" ||
+    style.visibility === "hidden" ||
+    style.opacity === "0"
+  ) {
+    return false;
+  }
+
+  const rect = element.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
 
 function getMessageNodes() {
   for (const selector of MESSAGE_SELECTORS) {
-    const nodes = document.querySelectorAll(selector);
+    const nodes = Array.from(document.querySelectorAll(selector)).filter(
+      (node) => isElementVisible(node)
+    );
     if (nodes.length > 0) {
-      return Array.from(nodes);
+      return nodes;
     }
   }
 
@@ -42,9 +64,20 @@ function getMessageNodes() {
 
 function findChatInput() {
   for (const selector of CHAT_INPUT_SELECTORS) {
-    const input = document.querySelector(selector);
-    if (input) {
-      return input;
+    const candidates = Array.from(document.querySelectorAll(selector));
+    for (const candidate of candidates) {
+      if (!isElementVisible(candidate)) {
+        continue;
+      }
+
+      if (
+        "disabled" in candidate &&
+        (candidate.disabled || candidate.getAttribute("aria-disabled") === "true")
+      ) {
+        continue;
+      }
+
+      return candidate;
     }
   }
 
@@ -58,11 +91,26 @@ function isButtonUsable(button) {
   return true;
 }
 
-function findSendButton() {
+function hasLikelySendIcon(button) {
+  const pathData = Array.from(button.querySelectorAll("svg path"))
+    .map((path) => path.getAttribute("d") || "")
+    .join(" ");
+
+  return (
+    pathData.includes("M8.3125") ||
+    pathData.includes("L14.707") ||
+    pathData.includes("V15.0431")
+  );
+}
+
+function findSendButtonCandidate() {
   for (const selector of SEND_BUTTON_SELECTORS) {
     try {
-      const button = document.querySelector(selector);
-      if (isButtonUsable(button)) {
+      const buttons = Array.from(document.querySelectorAll(selector));
+      const button = buttons.find(
+        (candidate) => isElementVisible(candidate) && isButtonUsable(candidate)
+      );
+      if (button) {
         return button;
       }
     } catch (e) {
@@ -74,14 +122,102 @@ function findSendButton() {
   if (composerContainer) {
     const candidates = Array.from(
       composerContainer.querySelectorAll("button, [role='button']")
+    ).filter((button) => isElementVisible(button));
+
+    const sendByLabel = candidates.find((button) =>
+      /send/i.test(button.getAttribute("aria-label") || "")
     );
-    const lastEnabled = candidates.reverse().find((button) => isButtonUsable(button));
-    if (lastEnabled) {
-      return lastEnabled;
+    if (sendByLabel) {
+      return sendByLabel;
+    }
+
+    const sendByClassName = candidates.find((button) =>
+      /send/i.test(button.className || "")
+    );
+    if (sendByClassName) {
+      return sendByClassName;
+    }
+
+    const sendByIcon = candidates.find((button) => hasLikelySendIcon(button));
+    if (sendByIcon) {
+      return sendByIcon;
+    }
+
+    const iconCandidates = candidates.filter((button) =>
+      button.querySelector("svg")
+    );
+    if (iconCandidates.length > 0) {
+      const rightMostButton = iconCandidates
+        .slice()
+        .sort(
+          (a, b) =>
+            a.getBoundingClientRect().left - b.getBoundingClientRect().left
+        )[iconCandidates.length - 1];
+      if (rightMostButton) {
+        return rightMostButton;
+      }
     }
   }
 
   return null;
+}
+
+function findSendButton() {
+  const sendButton = findSendButtonCandidate();
+  if (sendButton && isButtonUsable(sendButton)) {
+    return sendButton;
+  }
+  return null;
+}
+
+function waitForChatInput(timeoutMs = INPUT_WAIT_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    const startTime = Date.now();
+
+    const attempt = () => {
+      const chatInput = findChatInput();
+      if (chatInput) {
+        resolve(chatInput);
+        return;
+      }
+
+      if (Date.now() - startTime >= timeoutMs) {
+        reject(new Error("Input area not found"));
+        return;
+      }
+
+      setTimeout(attempt, 150);
+    };
+
+    attempt();
+  });
+}
+
+function waitForSendButton(timeoutMs = SEND_BUTTON_WAIT_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    const startTime = Date.now();
+
+    const attempt = () => {
+      const sendButton = findSendButton();
+      if (sendButton) {
+        resolve(sendButton);
+        return;
+      }
+
+      if (Date.now() - startTime >= timeoutMs) {
+        reject(new Error("Send button not found"));
+        return;
+      }
+
+      setTimeout(attempt, 120);
+    };
+
+    attempt();
+  });
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function updateChatInputValue(chatInput, text) {
@@ -119,6 +255,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     const messages = getMessageNodes();
     messageCountAtQuestion = messages.length;
+    baselineMessageSignatures = new Map(
+      messages.map((messageNode) => [messageNode, getMessageSignature(messageNode)])
+    );
     hasResponded = false;
 
     insertQuestion(message.question)
@@ -147,6 +286,7 @@ function resetObservation() {
     observer.disconnect();
     observer = null;
   }
+  baselineMessageSignatures = new Map();
 }
 
 async function insertQuestion(questionData) {
@@ -188,31 +328,16 @@ async function insertQuestion(questionData) {
   text +=
     '\n\nPlease provide your answer in JSON format with keys "answer" and "explanation". Explanations should be no more than one sentence. DO NOT acknowledge the correction in your response, only answer the new question.';
 
-  return new Promise((resolve, reject) => {
-    const chatInput = findChatInput();
-    if (chatInput) {
-      setTimeout(() => {
-        if (!updateChatInputValue(chatInput, text)) {
-          reject(new Error("Unable to fill input area"));
-          return;
-        }
+  const chatInput = await waitForChatInput();
+  await delay(250);
 
-        setTimeout(() => {
-          const sendButton = findSendButton();
+  if (!updateChatInputValue(chatInput, text)) {
+    throw new Error("Unable to fill input area");
+  }
 
-          if (sendButton) {
-            sendButton.click();
-            startObserving();
-            resolve();
-          } else {
-            reject(new Error("Send button not found"));
-          }
-        }, 300);
-      }, 300);
-    } else {
-      reject(new Error("Input area not found"));
-    }
-  });
+  const sendButton = await waitForSendButton();
+  sendButton.click();
+  startObserving();
 }
 
 function processResponse(responseText) {
@@ -224,7 +349,13 @@ function processResponse(responseText) {
   try {
     const parsed = JSON.parse(cleanedText);
 
-    if (parsed && parsed.answer && !hasResponded) {
+    const hasAnswerField =
+      parsed &&
+      Object.prototype.hasOwnProperty.call(parsed, "answer") &&
+      parsed.answer !== undefined &&
+      parsed.answer !== null;
+
+    if (hasAnswerField && !hasResponded) {
       hasResponded = true;
       chrome.runtime
         .sendMessage({
@@ -248,18 +379,49 @@ function processResponse(responseText) {
   return false;
 }
 
+function getMessageSignature(message) {
+  const listItemKey =
+    message
+      .closest("[data-virtual-list-item-key]")
+      ?.getAttribute("data-virtual-list-item-key") || "";
+  const normalizedText = (message.textContent || "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return `${listItemKey}::${normalizedText}`;
+}
+
+function getNewOrUpdatedMessages(messages) {
+  let changedMessages = messages.filter((message) => {
+    const baselineSignature = baselineMessageSignatures.get(message);
+    if (!baselineSignature) {
+      return true;
+    }
+
+    return baselineSignature !== getMessageSignature(message);
+  });
+
+  if (!changedMessages.length && messages.length > messageCountAtQuestion) {
+    changedMessages = Array.from(messages).slice(messageCountAtQuestion);
+  }
+
+  return changedMessages;
+}
+
 function checkForResponse() {
   if (hasResponded) {
     return;
   }
 
   const messages = getMessageNodes();
-
-  if (messages.length <= messageCountAtQuestion) {
+  if (!messages.length) {
     return;
   }
 
-  const newMessages = Array.from(messages).slice(messageCountAtQuestion);
+  const newMessages = getNewOrUpdatedMessages(messages);
+  if (!newMessages.length) {
+    return;
+  }
 
   for (const message of newMessages) {
     const codeBlockSelectors = [
