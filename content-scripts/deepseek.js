@@ -5,8 +5,10 @@ let observationTimeout = null;
 let checkIntervalId = null;
 let observer = null;
 let baselineMessageSignatures = new Map();
+let activeQuestionId = null;
 const INPUT_WAIT_TIMEOUT_MS = 15000;
 const SEND_BUTTON_WAIT_TIMEOUT_MS = 7000;
+const LOG_PREFIX = "[Auto-McGraw][deepseek]";
 const MESSAGE_SELECTORS = [
   "[data-testid='chat-message-assistant']",
   "[data-testid='message-content']",
@@ -252,6 +254,8 @@ function updateChatInputValue(chatInput, text) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "receiveQuestion") {
     resetObservation();
+    activeQuestionId = message.questionId || message.question?.questionId || null;
+    console.info(LOG_PREFIX, "Received question", activeQuestionId);
 
     const messages = getMessageNodes();
     messageCountAtQuestion = messages.length;
@@ -357,10 +361,12 @@ function processResponse(responseText) {
 
     if (hasAnswerField && !hasResponded) {
       hasResponded = true;
+      console.info(LOG_PREFIX, "Sending response", activeQuestionId);
       chrome.runtime
         .sendMessage({
           type: "deepseekResponse",
           response: cleanedText,
+          questionId: activeQuestionId,
         })
         .then(() => {
           resetObservation();
@@ -478,6 +484,7 @@ function checkForResponse() {
           chrome.runtime.sendMessage({
             type: "deepseekResponse",
             response: jsonMatch[0],
+            questionId: activeQuestionId,
           });
           resetObservation();
           return true;
@@ -491,6 +498,7 @@ function startObserving() {
   observationStartTime = Date.now();
   observationTimeout = setTimeout(() => {
     if (!hasResponded) {
+      console.warn(LOG_PREFIX, "Response timeout", activeQuestionId);
       resetObservation();
     }
   }, 180000);

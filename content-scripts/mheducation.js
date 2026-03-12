@@ -3,6 +3,14 @@ let isAutomating = false;
 let lastIncorrectQuestion = null;
 let lastCorrectAnswer = null;
 let matchingPauseIntervalId = null;
+let pendingQuestionId = null;
+let questionSequence = 0;
+const LOG_PREFIX = "[Auto-McGraw][mhe]";
+
+function createQuestionId() {
+  questionSequence += 1;
+  return `mhe_${Date.now()}_${questionSequence}`;
+}
 
 function setupMessageListener() {
   if (messageListener) {
@@ -11,13 +19,58 @@ function setupMessageListener() {
 
   messageListener = (message, sender, sendResponse) => {
     if (message.type === "processChatGPTResponse") {
-      processChatGPTResponse(message.response);
+      const responseQuestionId = message.questionId || null;
+      if (
+        pendingQuestionId &&
+        responseQuestionId &&
+        responseQuestionId !== pendingQuestionId
+      ) {
+        console.warn(
+          LOG_PREFIX,
+          "Ignoring stale response",
+          responseQuestionId,
+          "pending",
+          pendingQuestionId
+        );
+        sendResponse({ received: true, ignored: true });
+        return true;
+      }
+
+      processChatGPTResponse(message.response, responseQuestionId);
       sendResponse({ received: true });
       return true;
     }
 
     if (message.type === "alertMessage") {
       alert(message.message);
+      sendResponse({ received: true });
+      return true;
+    }
+
+    if (message.type === "aiRequestTimeout") {
+      const timeoutQuestionId = message.questionId || null;
+      if (
+        pendingQuestionId &&
+        timeoutQuestionId &&
+        timeoutQuestionId !== pendingQuestionId
+      ) {
+        sendResponse({ received: true, ignored: true });
+        return true;
+      }
+
+      console.warn(
+        LOG_PREFIX,
+        "AI timeout received; clearing pending question",
+        pendingQuestionId
+      );
+      pendingQuestionId = null;
+
+      if (isAutomating) {
+        setTimeout(() => {
+          checkForNextStep();
+        }, 500);
+      }
+
       sendResponse({ received: true });
       return true;
     }
@@ -141,6 +194,10 @@ function handleForcedLearning() {
 
 function checkForNextStep() {
   if (!isAutomating) return;
+  if (pendingQuestionId) {
+    console.info(LOG_PREFIX, "Waiting for response", pendingQuestionId);
+    return;
+  }
 
   if (handleTopicOverview()) {
     return;
@@ -154,9 +211,15 @@ function checkForNextStep() {
   if (container && !container.querySelector(".forced-learning")) {
     const qData = parseQuestion();
     if (qData) {
+      const questionId = createQuestionId();
+      qData.questionId = questionId;
+      pendingQuestionId = questionId;
+      console.info(LOG_PREFIX, "Dispatching question", questionId);
+
       chrome.runtime.sendMessage({
         type: "sendQuestionToChatGPT",
         question: qData,
+        questionId,
       });
     }
   }
@@ -537,8 +600,28 @@ function normalizeResponseAnswers(rawAnswer, questionType, container) {
   return dedupeAnswers(flattenedAnswers);
 }
 
-function processChatGPTResponse(responseText) {
+function processChatGPTResponse(responseText, responseQuestionId = null) {
   try {
+    if (
+      pendingQuestionId &&
+      responseQuestionId &&
+      responseQuestionId !== pendingQuestionId
+    ) {
+      console.warn(
+        LOG_PREFIX,
+        "Ignoring mismatched response",
+        responseQuestionId,
+        "pending",
+        pendingQuestionId
+      );
+      return;
+    }
+
+    if (pendingQuestionId) {
+      console.info(LOG_PREFIX, "Processing response", pendingQuestionId);
+    }
+    pendingQuestionId = null;
+
     if (handleTopicOverview()) {
       return;
     }
@@ -669,6 +752,7 @@ function processChatGPTResponse(responseText) {
     }
   } catch (e) {
     console.error("Error processing response:", e);
+    pendingQuestionId = null;
   }
 }
 
@@ -696,6 +780,7 @@ function addAssistantButton() {
       btn.addEventListener("click", () => {
         if (isAutomating) {
           isAutomating = false;
+          pendingQuestionId = null;
           clearMatchingPauseWatcher();
           chrome.storage.sync.get("aiModel", function (data) {
             const currentModel = data.aiModel || "chatgpt";
@@ -715,6 +800,7 @@ function addAssistantButton() {
           );
           if (proceed) {
             isAutomating = true;
+            pendingQuestionId = null;
             clearMatchingPauseWatcher();
             btn.textContent = "Stop Automation";
             checkForNextStep();

@@ -5,6 +5,13 @@ let lastActiveTabId = null;
 let processingQuestion = false;
 let mheWindowId = null;
 let aiWindowId = null;
+let pendingAiRequest = null;
+
+const LOG_PREFIX = "[Auto-McGraw][bg]";
+const AI_RESPONSE_TIMEOUT_MS = 45000;
+const AI_TIMEOUT_RETRY_LIMIT = 1;
+const COMPLETED_QUESTION_ID_LIMIT = 60;
+const completedQuestionIds = [];
 
 const AI_CONTENT_SCRIPT_FILES = {
   chatgpt: "content-scripts/chatgpt.js",
@@ -17,6 +24,14 @@ const DEEPSEEK_URL_PATTERNS = [
   "https://deepseek.chat/*",
 ];
 
+function logInfo(...args) {
+  console.info(LOG_PREFIX, ...args);
+}
+
+function logWarn(...args) {
+  console.warn(LOG_PREFIX, ...args);
+}
+
 function isDeepSeekTabUrl(url = "") {
   return url.includes("chat.deepseek.com") || url.includes("deepseek.chat");
 }
@@ -24,6 +39,43 @@ function isDeepSeekTabUrl(url = "") {
 chrome.tabs.onActivated.addListener((activeInfo) => {
   lastActiveTabId = activeInfo.tabId;
 });
+
+function createQuestionId() {
+  return `q_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function getQuestionIdFromMessage(message) {
+  return message?.questionId || message?.question?.questionId || null;
+}
+
+function cacheCompletedQuestionId(questionId) {
+  if (!questionId) return;
+  completedQuestionIds.push(questionId);
+  if (completedQuestionIds.length > COMPLETED_QUESTION_ID_LIMIT) {
+    completedQuestionIds.splice(
+      0,
+      completedQuestionIds.length - COMPLETED_QUESTION_ID_LIMIT
+    );
+  }
+}
+
+function hasCompletedQuestionId(questionId) {
+  return Boolean(questionId && completedQuestionIds.includes(questionId));
+}
+
+function clearPendingAiRequest(reason = "") {
+  if (!pendingAiRequest) return;
+
+  if (pendingAiRequest.timeoutId) {
+    clearTimeout(pendingAiRequest.timeoutId);
+  }
+
+  logInfo(
+    `Cleared pending request${reason ? ` (${reason})` : ""}:`,
+    pendingAiRequest.questionId
+  );
+  pendingAiRequest = null;
+}
 
 function sendMessageWithRetry(tabId, message, maxAttempts = 3, delay = 1000) {
   return new Promise((resolve, reject) => {
@@ -105,22 +157,30 @@ async function injectAiContentScript(tabId) {
   });
 }
 
-async function sendQuestionToAiWithRetry(question, maxAttempts = 4, delay = 900) {
+async function sendQuestionToAiWithRetry(
+  questionPayload,
+  maxAttempts = 4,
+  delay = 900
+) {
   let lastErrorMessage = "AI tab did not accept the question.";
+  const questionId = questionPayload?.questionId || "unknown";
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
+      logInfo(`Sending question ${questionId} to ${aiType} (attempt ${attempt})`);
       const response = await sendMessageWithRetry(
         aiTabId,
         {
           type: "receiveQuestion",
-          question,
+          question: questionPayload,
+          questionId,
         },
         1,
         0
       );
 
       if (response && response.received) {
+        logInfo(`Question ${questionId} accepted by ${aiType}`);
         return response;
       }
 
@@ -134,6 +194,9 @@ async function sendQuestionToAiWithRetry(question, maxAttempts = 4, delay = 900)
 
       if (isMissingReceiverError(error) && aiTabId) {
         try {
+          logWarn(
+            `Missing receiver for ${questionId}; injecting ${aiType} script and retrying`
+          );
           await injectAiContentScript(aiTabId);
           await sleep(250);
         } catch (injectError) {
@@ -243,6 +306,87 @@ async function shouldFocusTabs() {
   return mheWindowId === aiWindowId;
 }
 
+async function notifyMhe(messageText) {
+  if (!mheTabId) return;
+  try {
+    await sendMessageWithRetry(mheTabId, {
+      type: "alertMessage",
+      message: messageText,
+    });
+  } catch (error) {
+    logWarn("Unable to notify MHE tab:", getErrorMessage(error));
+  }
+}
+
+async function notifyMheTimeout(questionId, messageText) {
+  if (!mheTabId) return;
+  try {
+    await sendMessageWithRetry(mheTabId, {
+      type: "aiRequestTimeout",
+      questionId,
+      message: messageText,
+    });
+  } catch (error) {
+    logWarn("Unable to send timeout signal to MHE tab:", getErrorMessage(error));
+  }
+}
+
+async function triggerAiTimeoutRetry(expectedQuestionId) {
+  if (
+    !pendingAiRequest ||
+    pendingAiRequest.questionId !== expectedQuestionId ||
+    pendingAiRequest.retryCount >= AI_TIMEOUT_RETRY_LIMIT
+  ) {
+    return false;
+  }
+
+  pendingAiRequest.retryCount += 1;
+  logWarn(
+    `Timeout for ${expectedQuestionId}; retry ${pendingAiRequest.retryCount}/${AI_TIMEOUT_RETRY_LIMIT}`
+  );
+
+  try {
+    await findAndStoreTabs();
+    const sameWindow = await shouldFocusTabs();
+    if (sameWindow) {
+      await focusTab(aiTabId);
+      await sleep(300);
+    }
+
+    await sendQuestionToAiWithRetry(pendingAiRequest.questionPayload);
+    scheduleAiRequestWatchdog(expectedQuestionId);
+    return true;
+  } catch (error) {
+    logWarn(`Retry failed for ${expectedQuestionId}:`, getErrorMessage(error));
+    return false;
+  }
+}
+
+function scheduleAiRequestWatchdog(questionId) {
+  if (!pendingAiRequest || pendingAiRequest.questionId !== questionId) {
+    return;
+  }
+
+  if (pendingAiRequest.timeoutId) {
+    clearTimeout(pendingAiRequest.timeoutId);
+  }
+
+  pendingAiRequest.timeoutId = setTimeout(async () => {
+    if (!pendingAiRequest || pendingAiRequest.questionId !== questionId) {
+      return;
+    }
+
+    const retried = await triggerAiTimeoutRetry(questionId);
+    if (retried) {
+      return;
+    }
+
+    const timeoutMessage = `Timed out waiting for ${aiType} response. Retrying question flow.`;
+    await notifyMheTimeout(questionId, timeoutMessage);
+    clearPendingAiRequest("watchdog_timeout");
+  }, AI_RESPONSE_TIMEOUT_MS);
+}
+
 async function processQuestion(message) {
   if (processingQuestion) return;
   processingQuestion = true;
@@ -251,15 +395,27 @@ async function processQuestion(message) {
     await findAndStoreTabs();
 
     if (!aiTabId) {
-      await sendMessageWithRetry(mheTabId, {
-        type: "alertMessage",
-        message: `Please open ${aiType} in another tab before using automation.`,
-      });
+      await notifyMhe(`Please open ${aiType} in another tab before using automation.`);
       return;
     }
 
     if (!mheTabId) {
       mheTabId = message.sourceTabId;
+    }
+
+    const questionPayload = { ...(message.question || {}) };
+    if (!questionPayload.questionId) {
+      questionPayload.questionId = createQuestionId();
+    }
+    const questionId = questionPayload.questionId;
+
+    if (hasCompletedQuestionId(questionId)) {
+      logWarn(`Ignoring already-completed question id ${questionId}`);
+      return;
+    }
+
+    if (pendingAiRequest && pendingAiRequest.questionId !== questionId) {
+      clearPendingAiRequest("new_question_replaced_previous");
     }
 
     const sameWindow = await shouldFocusTabs();
@@ -269,7 +425,18 @@ async function processQuestion(message) {
       await sleep(300);
     }
 
-    await sendQuestionToAiWithRetry(message.question);
+    await sendQuestionToAiWithRetry(questionPayload);
+
+    pendingAiRequest = {
+      questionId,
+      questionPayload,
+      mheTabId,
+      aiType,
+      retryCount: 0,
+      createdAt: Date.now(),
+      timeoutId: null,
+    };
+    scheduleAiRequestWatchdog(questionId);
 
     if (sameWindow && lastActiveTabId && lastActiveTabId !== aiTabId) {
       setTimeout(async () => {
@@ -277,12 +444,8 @@ async function processQuestion(message) {
       }, 1000);
     }
   } catch (error) {
-    if (mheTabId) {
-      await sendMessageWithRetry(mheTabId, {
-        type: "alertMessage",
-        message: `Error communicating with ${aiType}: ${getErrorMessage(error)}`,
-      });
-    }
+    await notifyMhe(`Error communicating with ${aiType}: ${getErrorMessage(error)}`);
+    clearPendingAiRequest("process_question_error");
   } finally {
     processingQuestion = false;
   }
@@ -290,6 +453,24 @@ async function processQuestion(message) {
 
 async function processResponse(message) {
   try {
+    const responseQuestionId = message.questionId || null;
+
+    if (responseQuestionId && hasCompletedQuestionId(responseQuestionId)) {
+      logWarn(`Ignoring duplicate completed response for ${responseQuestionId}`);
+      return;
+    }
+
+    if (pendingAiRequest) {
+      if (!responseQuestionId) {
+        logWarn("Response missing questionId; accepting for backward compatibility");
+      } else if (responseQuestionId !== pendingAiRequest.questionId) {
+        logWarn(
+          `Ignoring stale response ${responseQuestionId}; pending is ${pendingAiRequest.questionId}`
+        );
+        return;
+      }
+    }
+
     if (!mheTabId) {
       const mheTabs = await chrome.tabs.query({
         url: [
@@ -319,7 +500,12 @@ async function processResponse(message) {
     await sendMessageWithRetry(mheTabId, {
       type: "processChatGPTResponse",
       response: message.response,
+      questionId: responseQuestionId || pendingAiRequest?.questionId || null,
     });
+
+    const completedId = responseQuestionId || pendingAiRequest?.questionId;
+    cacheCompletedQuestionId(completedId);
+    clearPendingAiRequest("response_processed");
   } catch (error) {
     console.error("Error processing AI response:", error);
   }
@@ -352,7 +538,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === "sendQuestionToChatGPT") {
     processQuestion(message);
-    sendResponse({ received: true });
+    sendResponse({ received: true, questionId: getQuestionIdFromMessage(message) });
     return true;
   }
 

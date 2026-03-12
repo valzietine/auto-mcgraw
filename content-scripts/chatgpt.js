@@ -3,10 +3,14 @@ let messageCountAtQuestion = 0;
 let observationStartTime = 0;
 let observationTimeout = null;
 let observer = null;
+let activeQuestionId = null;
+const LOG_PREFIX = "[Auto-McGraw][chatgpt]";
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "receiveQuestion") {
     resetObservation();
+    activeQuestionId = message.questionId || message.question?.questionId || null;
+    console.info(LOG_PREFIX, "Received question", activeQuestionId);
 
     const messages = document.querySelectorAll(
       '[data-message-author-role="assistant"]'
@@ -108,6 +112,7 @@ function startObserving() {
   observationStartTime = Date.now();
   observationTimeout = setTimeout(() => {
     if (!hasResponded) {
+      console.warn(LOG_PREFIX, "Response timeout", activeQuestionId);
       resetObservation();
     }
   }, 180000);
@@ -146,12 +151,20 @@ function startObserving() {
 
     try {
       const parsed = JSON.parse(responseText);
-      if (parsed.answer && !hasResponded) {
+      const hasAnswerField =
+        parsed &&
+        Object.prototype.hasOwnProperty.call(parsed, "answer") &&
+        parsed.answer !== undefined &&
+        parsed.answer !== null;
+
+      if (hasAnswerField && !hasResponded) {
         hasResponded = true;
+        console.info(LOG_PREFIX, "Sending response", activeQuestionId);
         chrome.runtime
           .sendMessage({
             type: "chatGPTResponse",
             response: responseText,
+            questionId: activeQuestionId,
           })
           .then(() => {
             resetObservation();
@@ -174,6 +187,7 @@ function startObserving() {
             chrome.runtime.sendMessage({
               type: "chatGPTResponse",
               response: jsonMatch[0],
+              questionId: activeQuestionId,
             });
             resetObservation();
           }
