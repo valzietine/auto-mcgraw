@@ -5,6 +5,7 @@ let lastCorrectAnswer = null;
 let matchingPauseIntervalId = null;
 let pendingQuestionId = null;
 let questionSequence = 0;
+let lastResponseFormatIssue = null;
 const LOG_PREFIX = "[Auto-McGraw][mhe]";
 
 function createQuestionId() {
@@ -108,24 +109,75 @@ function clearMatchingPauseWatcher() {
   }
 }
 
+function isElementDisabled(element) {
+  if (!element) return true;
+  if (element.disabled) return true;
+  if (element.getAttribute("aria-disabled") === "true") return true;
+  return (
+    element.classList.contains("disabled") ||
+    element.classList.contains("is-disabled")
+  );
+}
+
+function getNextButton() {
+  return document.querySelector(".next-button");
+}
+
+function isQuestionCompleted(container) {
+  if (!container) return false;
+
+  if (
+    container.querySelector(
+      ".awd-probe-correctness.correct, .awd-probe-correctness.incorrect"
+    )
+  ) {
+    return true;
+  }
+
+  if (container.querySelector(".correct-answer-container")) {
+    return true;
+  }
+
+  const highConfidenceButton = document.querySelector(
+    '[data-automation-id="confidence-buttons--high_confidence"]'
+  );
+  const nextButton = getNextButton();
+
+  return (
+    highConfidenceButton &&
+    isElementDisabled(highConfidenceButton) &&
+    nextButton &&
+    !isElementDisabled(nextButton)
+  );
+}
+
+function advanceCompletedQuestionIfNeeded(container) {
+  if (!isQuestionCompleted(container)) return false;
+
+  const nextButton = getNextButton();
+  if (!nextButton || isElementDisabled(nextButton)) {
+    console.info(LOG_PREFIX, "Question appears completed, waiting for next button");
+    return false;
+  }
+
+  console.info(LOG_PREFIX, "Question already completed; advancing to next");
+  nextButton.click();
+
+  setTimeout(() => {
+    if (isAutomating) {
+      checkForNextStep();
+    }
+  }, 1000);
+
+  return true;
+}
+
 function getQuestionSignature(container) {
   if (!container) return "";
 
   const questionType = detectQuestionType(container);
-  if (questionType === "matching") {
-    const promptText =
-      container.querySelector(".prompt")?.textContent?.trim() || "";
-    const prompts = Array.from(
-      container.querySelectorAll(".match-prompt .content")
-    )
-      .map((el) => normalizeChoiceText(el.textContent))
-      .filter(Boolean)
-      .join("|");
-
-    return `${questionType}::${normalizeChoiceText(promptText)}::${prompts}`;
-  }
-
-  const promptText = container.querySelector(".prompt")?.textContent?.trim() || "";
+  const promptText =
+    container.querySelector(".prompt")?.textContent?.trim() || "";
 
   return `${questionType}::${normalizeChoiceText(promptText)}`;
 }
@@ -134,6 +186,7 @@ function pauseForManualMatchingAndResume(questionSignature) {
   if (!questionSignature) return;
 
   clearMatchingPauseWatcher();
+  console.info(LOG_PREFIX, "Paused for manual matching", questionSignature);
 
   matchingPauseIntervalId = setInterval(() => {
     if (!isAutomating) {
@@ -146,6 +199,13 @@ function pauseForManualMatchingAndResume(questionSignature) {
 
     const currentSignature = getQuestionSignature(currentContainer);
     if (currentSignature && currentSignature !== questionSignature) {
+      console.info(
+        LOG_PREFIX,
+        "Detected question change after matching",
+        questionSignature,
+        "->",
+        currentSignature
+      );
       clearMatchingPauseWatcher();
 
       setTimeout(() => {
@@ -209,6 +269,10 @@ function checkForNextStep() {
 
   const container = document.querySelector(".probe-container");
   if (container && !container.querySelector(".forced-learning")) {
+    if (advanceCompletedQuestionIfNeeded(container)) {
+      return;
+    }
+
     const qData = parseQuestion();
     if (qData) {
       const questionId = createQuestionId();
@@ -221,6 +285,12 @@ function checkForNextStep() {
         question: qData,
         questionId,
       });
+    } else {
+      setTimeout(() => {
+        if (isAutomating && !pendingQuestionId) {
+          checkForNextStep();
+        }
+      }, 700);
     }
   }
 }
@@ -600,6 +670,103 @@ function normalizeResponseAnswers(rawAnswer, questionType, container) {
   return dedupeAnswers(flattenedAnswers);
 }
 
+function stripCodeFences(text) {
+  if (typeof text !== "string") return "";
+  return text
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+}
+
+function extractAnswerFromArrayLiteral(arrayText) {
+  if (typeof arrayText !== "string") return [];
+
+  const answers = [];
+  const itemRegex = /"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'/g;
+  let match;
+
+  while ((match = itemRegex.exec(arrayText)) !== null) {
+    const value = match[1] !== undefined ? match[1] : match[2];
+    const normalized = normalizeChoiceText(value.replace(/\\"/g, '"'));
+    if (normalized) {
+      answers.push(normalized);
+    }
+  }
+
+  return answers;
+}
+
+function extractAnswerFromMalformedResponse(responseText) {
+  if (typeof responseText !== "string") return null;
+
+  const normalizedText = stripCodeFences(responseText);
+  if (!normalizedText) return null;
+
+  const quotedMatch = normalizedText.match(
+    /["']answer["']\s*:\s*"((?:\\.|[^"\\])*)"|["']answer["']\s*:\s*'((?:\\.|[^'\\])*)'/i
+  );
+  if (quotedMatch) {
+    const raw = quotedMatch[1] !== undefined ? quotedMatch[1] : quotedMatch[2];
+    const answer = normalizeChoiceText(raw.replace(/\\"/g, '"'));
+    return answer || null;
+  }
+
+  const arrayMatch = normalizedText.match(/["']answer["']\s*:\s*\[([\s\S]*?)\]/i);
+  if (arrayMatch) {
+    const answers = extractAnswerFromArrayLiteral(arrayMatch[1]);
+    if (answers.length > 0) {
+      return answers;
+    }
+  }
+
+  const bareMatch = normalizedText.match(/["']answer["']\s*:\s*([^,\n}]+)/i);
+  if (bareMatch) {
+    const answer = normalizeChoiceText(bareMatch[1].replace(/^["']|["']$/g, ""));
+    return answer || null;
+  }
+
+  return null;
+}
+
+function parseAiResponse(responseText) {
+  const normalizedText = stripCodeFences(responseText);
+  if (!normalizedText) {
+    throw new Error("AI response was empty");
+  }
+
+  try {
+    const parsed = JSON.parse(normalizedText);
+    if (
+      parsed &&
+      Object.prototype.hasOwnProperty.call(parsed, "answer") &&
+      parsed.answer !== undefined &&
+      parsed.answer !== null
+    ) {
+      return parsed;
+    }
+  } catch (parseError) {
+    const extractedAnswer = extractAnswerFromMalformedResponse(normalizedText);
+    if (extractedAnswer === null) {
+      throw parseError;
+    }
+
+    return {
+      answer: extractedAnswer,
+      explanation: "",
+    };
+  }
+
+  const extractedAnswer = extractAnswerFromMalformedResponse(normalizedText);
+  if (extractedAnswer !== null) {
+    return {
+      answer: extractedAnswer,
+      explanation: "",
+    };
+  }
+
+  throw new Error("AI response missing answer field");
+}
+
 function processChatGPTResponse(responseText, responseQuestionId = null) {
   try {
     if (
@@ -633,12 +800,13 @@ function processChatGPTResponse(responseText, responseQuestionId = null) {
     const container = document.querySelector(".probe-container");
     if (!container) return;
     const questionType = detectQuestionType(container);
-    const response = JSON.parse(responseText);
+    const response = parseAiResponse(responseText);
     const answers = normalizeResponseAnswers(
       response.answer,
       questionType,
       container
     );
+    lastResponseFormatIssue = null;
 
     lastIncorrectQuestion = null;
     lastCorrectAnswer = null;
@@ -753,6 +921,19 @@ function processChatGPTResponse(responseText, responseQuestionId = null) {
   } catch (e) {
     console.error("Error processing response:", e);
     pendingQuestionId = null;
+    if (e?.message?.includes("answer field")) {
+      lastResponseFormatIssue =
+        'Your previous response did not include the required "answer" field. You must respond with a valid JSON object containing "answer" and "explanation".';
+    } else {
+      lastResponseFormatIssue =
+        'Your previous response was not valid JSON. Respond with only a valid JSON object containing "answer" and "explanation".';
+    }
+
+    if (isAutomating) {
+      setTimeout(() => {
+        checkForNextStep();
+      }, 750);
+    }
   }
 }
 
@@ -781,6 +962,7 @@ function addAssistantButton() {
         if (isAutomating) {
           isAutomating = false;
           pendingQuestionId = null;
+          lastResponseFormatIssue = null;
           clearMatchingPauseWatcher();
           chrome.storage.sync.get("aiModel", function (data) {
             const currentModel = data.aiModel || "chatgpt";
@@ -801,6 +983,7 @@ function addAssistantButton() {
           if (proceed) {
             isAutomating = true;
             pendingQuestionId = null;
+            lastResponseFormatIssue = null;
             clearMatchingPauseWatcher();
             btn.textContent = "Stop Automation";
             checkForNextStep();
@@ -857,6 +1040,10 @@ function parseQuestion() {
   }
 
   const questionType = detectQuestionType(container);
+  if (!questionType) {
+    console.warn(LOG_PREFIX, "Unable to detect question type; waiting for next state");
+    return null;
+  }
 
   let questionText = "";
   const promptEl = container.querySelector(".prompt");
@@ -886,10 +1073,14 @@ function parseQuestion() {
   if (questionType === "matching") {
     const prompts = Array.from(
       container.querySelectorAll(".match-prompt .content")
-    ).map((el) => el.textContent.trim());
+    )
+      .map((el) => normalizeChoiceText(el.textContent))
+      .filter(Boolean);
     const choices = Array.from(
       container.querySelectorAll(".choices-container .content")
-    ).map((el) => el.textContent.trim());
+    )
+      .map((el) => normalizeChoiceText(el.textContent))
+      .filter(Boolean);
     options = { prompts, choices };
   } else if (questionType === "select_text") {
     options = Array.from(
@@ -907,6 +1098,7 @@ function parseQuestion() {
     type: questionType,
     question: questionText,
     options: options,
+    previousFormatIssue: lastResponseFormatIssue,
     previousCorrection: lastIncorrectQuestion
       ? {
           question: lastIncorrectQuestion,

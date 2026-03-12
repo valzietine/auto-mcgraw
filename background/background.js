@@ -1,7 +1,6 @@
 let mheTabId = null;
 let aiTabId = null;
 let aiType = null;
-let lastActiveTabId = null;
 let processingQuestion = false;
 let mheWindowId = null;
 let aiWindowId = null;
@@ -10,6 +9,12 @@ let pendingAiRequest = null;
 const LOG_PREFIX = "[Auto-McGraw][bg]";
 const AI_RESPONSE_TIMEOUT_MS = 45000;
 const AI_TIMEOUT_RETRY_LIMIT = 1;
+const AI_RESPONSE_TIMEOUT_BY_TYPE_MS = {
+  deepseek: 90000,
+};
+const AI_TIMEOUT_RETRY_LIMIT_BY_TYPE = {
+  deepseek: 2,
+};
 const COMPLETED_QUESTION_ID_LIMIT = 60;
 const completedQuestionIds = [];
 
@@ -36,10 +41,6 @@ function isDeepSeekTabUrl(url = "") {
   return url.includes("chat.deepseek.com") || url.includes("deepseek.chat");
 }
 
-chrome.tabs.onActivated.addListener((activeInfo) => {
-  lastActiveTabId = activeInfo.tabId;
-});
-
 function createQuestionId() {
   return `q_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -61,6 +62,21 @@ function cacheCompletedQuestionId(questionId) {
 
 function hasCompletedQuestionId(questionId) {
   return Boolean(questionId && completedQuestionIds.includes(questionId));
+}
+
+function getPendingAiType() {
+  return pendingAiRequest?.aiType || aiType || "chatgpt";
+}
+
+function getResponseTimeoutMsForAi(aiModel) {
+  return AI_RESPONSE_TIMEOUT_BY_TYPE_MS[aiModel] || AI_RESPONSE_TIMEOUT_MS;
+}
+
+function getTimeoutRetryLimitForAi(aiModel) {
+  const configuredLimit = AI_TIMEOUT_RETRY_LIMIT_BY_TYPE[aiModel];
+  return Number.isInteger(configuredLimit)
+    ? configuredLimit
+    : AI_TIMEOUT_RETRY_LIMIT;
 }
 
 function clearPendingAiRequest(reason = "") {
@@ -301,11 +317,6 @@ async function findAndStoreTabs() {
   }
 }
 
-async function shouldFocusTabs() {
-  await findAndStoreTabs();
-  return mheWindowId === aiWindowId;
-}
-
 async function notifyMhe(messageText) {
   if (!mheTabId) return;
   try {
@@ -332,25 +343,29 @@ async function notifyMheTimeout(questionId, messageText) {
 }
 
 async function triggerAiTimeoutRetry(expectedQuestionId) {
+  const requestAiType = getPendingAiType();
+  const retryLimit = getTimeoutRetryLimitForAi(requestAiType);
+
   if (
     !pendingAiRequest ||
     pendingAiRequest.questionId !== expectedQuestionId ||
-    pendingAiRequest.retryCount >= AI_TIMEOUT_RETRY_LIMIT
+    pendingAiRequest.retryCount >= retryLimit
   ) {
     return false;
   }
 
   pendingAiRequest.retryCount += 1;
   logWarn(
-    `Timeout for ${expectedQuestionId}; retry ${pendingAiRequest.retryCount}/${AI_TIMEOUT_RETRY_LIMIT}`
+    `Timeout for ${expectedQuestionId}; retry ${pendingAiRequest.retryCount}/${retryLimit}`
   );
 
   try {
     await findAndStoreTabs();
-    const sameWindow = await shouldFocusTabs();
-    if (sameWindow) {
-      await focusTab(aiTabId);
+    const focusedAi = await focusTab(aiTabId);
+    if (focusedAi) {
       await sleep(300);
+    } else {
+      logWarn(`Could not focus AI tab ${aiTabId} during retry`);
     }
 
     await sendQuestionToAiWithRetry(pendingAiRequest.questionPayload);
@@ -371,6 +386,12 @@ function scheduleAiRequestWatchdog(questionId) {
     clearTimeout(pendingAiRequest.timeoutId);
   }
 
+  const requestAiType = getPendingAiType();
+  const timeoutMs = getResponseTimeoutMsForAi(requestAiType);
+  logInfo(
+    `Scheduling watchdog for ${questionId} (${requestAiType}, ${timeoutMs}ms)`
+  );
+
   pendingAiRequest.timeoutId = setTimeout(async () => {
     if (!pendingAiRequest || pendingAiRequest.questionId !== questionId) {
       return;
@@ -381,10 +402,10 @@ function scheduleAiRequestWatchdog(questionId) {
       return;
     }
 
-    const timeoutMessage = `Timed out waiting for ${aiType} response. Retrying question flow.`;
+    const timeoutMessage = `Timed out waiting for ${requestAiType} response. Retrying question flow.`;
     await notifyMheTimeout(questionId, timeoutMessage);
     clearPendingAiRequest("watchdog_timeout");
-  }, AI_RESPONSE_TIMEOUT_MS);
+  }, timeoutMs);
 }
 
 async function processQuestion(message) {
@@ -418,11 +439,11 @@ async function processQuestion(message) {
       clearPendingAiRequest("new_question_replaced_previous");
     }
 
-    const sameWindow = await shouldFocusTabs();
-
-    if (sameWindow) {
-      await focusTab(aiTabId);
+    const focusedAi = await focusTab(aiTabId);
+    if (focusedAi) {
       await sleep(300);
+    } else {
+      logWarn(`Could not focus AI tab ${aiTabId}; sending question in background`);
     }
 
     await sendQuestionToAiWithRetry(questionPayload);
@@ -437,12 +458,6 @@ async function processQuestion(message) {
       timeoutId: null,
     };
     scheduleAiRequestWatchdog(questionId);
-
-    if (sameWindow && lastActiveTabId && lastActiveTabId !== aiTabId) {
-      setTimeout(async () => {
-        await focusTab(lastActiveTabId);
-      }, 1000);
-    }
   } catch (error) {
     await notifyMhe(`Error communicating with ${aiType}: ${getErrorMessage(error)}`);
     clearPendingAiRequest("process_question_error");
@@ -488,13 +503,6 @@ async function processResponse(message) {
       } else {
         return;
       }
-    }
-
-    const sameWindow = await shouldFocusTabs();
-
-    if (sameWindow) {
-      await focusTab(mheTabId);
-      await sleep(300);
     }
 
     await sendMessageWithRetry(mheTabId, {

@@ -41,8 +41,15 @@ function resetObservation() {
 }
 
 async function insertQuestion(questionData) {
-  const { type, question, options, previousCorrection } = questionData;
+  const { type, question, options, previousCorrection, previousFormatIssue } =
+    questionData;
   let text = `Type: ${type}\nQuestion: ${question}`;
+
+  if (previousFormatIssue) {
+    text =
+      `FORMAT REQUIREMENT FROM PREVIOUS RESPONSE: ${previousFormatIssue}\n\nNow answer this same question again.\n\n` +
+      text;
+  }
 
   if (
     previousCorrection &&
@@ -77,7 +84,7 @@ async function insertQuestion(questionData) {
   }
 
   text +=
-    '\n\nPlease provide your answer in JSON format with keys "answer" and "explanation". Explanations should be no more than one sentence. DO NOT acknowledge the correction in your response, only answer the new question.';
+    '\n\nRespond with ONLY a valid JSON object with keys "answer" and "explanation". The "answer" field is required. Do not wrap the JSON in markdown or code fences. Escape any internal double quotes in strings (for example: \\"text\\"). Explanations should be no more than one sentence. DO NOT acknowledge corrections or format reminders; only answer the current question.';
 
   return new Promise((resolve, reject) => {
     const inputArea = document.querySelector(".ql-editor");
@@ -165,6 +172,31 @@ function startObserving() {
             resetObservation();
           })
           .catch((error) => {
+            console.error("Error sending response:", error);
+          });
+        return;
+      }
+
+      if (!hasResponded) {
+        hasResponded = true;
+        console.warn(LOG_PREFIX, "Response missing answer field", activeQuestionId);
+        chrome.runtime
+          .sendMessage({
+            type: "geminiResponse",
+            response: JSON.stringify({
+              formatError: "missing_answer_field",
+              explanation:
+                typeof parsed.explanation === "string"
+                  ? parsed.explanation
+                  : "",
+            }),
+            questionId: activeQuestionId,
+          })
+          .then(() => {
+            resetObservation();
+          })
+          .catch((error) => {
+            hasResponded = false;
             console.error("Error sending response:", error);
           });
       }
