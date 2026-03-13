@@ -27,6 +27,10 @@ let consecutiveDispatchReadinessMisses = 0;
 let sameProgressSignatureDriftCount = 0;
 let sameProgressSignatureDriftProgress = null;
 const sameProgressSignatureDriftSignatures = new Set();
+let isWaitingForManualRecovery = false;
+let manualRecoveryIntervalId = null;
+let manualRecoveryInFlight = false;
+let manualRecoveryContext = null;
 
 function createQuestionId() {
   questionSequence += 1;
@@ -320,6 +324,197 @@ async function waitForQuizTransition(
   }
 }
 
+function clearManualRecoveryWatcher() {
+  if (manualRecoveryIntervalId !== null) {
+    clearInterval(manualRecoveryIntervalId);
+    manualRecoveryIntervalId = null;
+  }
+}
+
+function clearManualRecoveryState() {
+  isWaitingForManualRecovery = false;
+  manualRecoveryInFlight = false;
+  manualRecoveryContext = null;
+  clearManualRecoveryWatcher();
+}
+
+function formatAnswerForManualDisplay(answer) {
+  if (answer === null || answer === undefined) {
+    return "(no answer returned)";
+  }
+
+  if (Array.isArray(answer)) {
+    if (!answer.length) {
+      return "[]";
+    }
+
+    return answer
+      .map((item, index) => `${index + 1}. ${formatAnswerForManualDisplay(item)}`)
+      .join("\n");
+  }
+
+  if (typeof answer === "string") {
+    const trimmed = answer.trim();
+    return trimmed || "(empty string)";
+  }
+
+  if (typeof answer === "number" || typeof answer === "boolean") {
+    return String(answer);
+  }
+
+  if (typeof answer === "object") {
+    try {
+      return JSON.stringify(answer, null, 2);
+    } catch (error) {
+      return String(answer);
+    }
+  }
+
+  return String(answer);
+}
+
+function getManualRecoveryInstructions(questionType) {
+  if (questionType === "multiple_choice") {
+    return "Select the option whose text best matches the suggested answer.";
+  }
+
+  if (questionType === "true_false") {
+    return "Choose True or False to match the suggested answer.";
+  }
+
+  if (questionType === "fill_in_the_blank") {
+    return "Type the suggested answer into the blank exactly as shown.";
+  }
+
+  return "Apply the suggested answer manually on the current question.";
+}
+
+function buildManualRecoveryMessage(context) {
+  const reason = context?.reason || "Answer could not be applied reliably.";
+  const formattedAnswer = formatAnswerForManualDisplay(context?.answer);
+  const instructions = getManualRecoveryInstructions(context?.questionType);
+
+  return (
+    `Automation paused: ${reason}\n\n` +
+    `Suggested answer from AI:\n${formattedAnswer}\n\n` +
+    `How to answer manually:\n${instructions}\n\n` +
+    "After you select or enter the answer, Auto-McGraw will click Next and resume automatically."
+  );
+}
+
+function pauseForManualRecovery(context) {
+  if (!isAutomating) return;
+
+  clearManualRecoveryWatcher();
+  isWaitingForManualRecovery = true;
+  manualRecoveryInFlight = false;
+  manualRecoveryContext = context;
+
+  if (scheduledNextStepTimeoutId !== null) {
+    clearTimeout(scheduledNextStepTimeoutId);
+    scheduledNextStepTimeoutId = null;
+  }
+
+  alert(buildManualRecoveryMessage(context));
+
+  manualRecoveryIntervalId = setInterval(() => {
+    if (!isAutomating) {
+      clearManualRecoveryState();
+      return;
+    }
+
+    if (!isWaitingForManualRecovery || !manualRecoveryContext) {
+      clearManualRecoveryWatcher();
+      return;
+    }
+
+    if (manualRecoveryInFlight) {
+      return;
+    }
+
+    if (checkForQuizEnd()) {
+      stopAutomation("Quiz completed - all questions answered");
+      return;
+    }
+
+    const currentSnapshot = getQuizStateSnapshot();
+    if (
+      manualRecoveryContext.questionSignature &&
+      currentSnapshot.signature &&
+      currentSnapshot.signature !== manualRecoveryContext.questionSignature
+    ) {
+      clearManualRecoveryState();
+      if (checkForQuizEnd()) {
+        stopAutomation("Quiz completed - all questions answered");
+        return;
+      }
+      scheduleCheckForNextStep(0, "manual_recovery_user_advanced");
+      return;
+    }
+
+    const fingerprintChanged =
+      getAnswerCommitFingerprint() !== manualRecoveryContext.preApplyFingerprint;
+    const nextEnabled = isNextQuizButtonEnabled();
+    if (!fingerprintChanged || !nextEnabled) {
+      return;
+    }
+
+    manualRecoveryInFlight = true;
+    const transitionSnapshot = getQuizStateSnapshot();
+
+    (async () => {
+      try {
+        const nextButton = await waitForNextQuizButton(5000);
+        if (!isAutomating || !isWaitingForManualRecovery) {
+          manualRecoveryInFlight = false;
+          return;
+        }
+
+        const latestSnapshot = getQuizStateSnapshot();
+        if (
+          manualRecoveryContext?.questionSignature &&
+          latestSnapshot.signature &&
+          latestSnapshot.signature !== manualRecoveryContext.questionSignature
+        ) {
+          clearManualRecoveryState();
+          if (checkForQuizEnd()) {
+            stopAutomation("Quiz completed - all questions answered");
+            return;
+          }
+          scheduleCheckForNextStep(0, "manual_recovery_user_advanced");
+          return;
+        }
+
+        nextButton.click();
+        const transitioned = await waitForQuizTransition(
+          transitionSnapshot,
+          QUIZ_TRANSITION_TIMEOUT_MS
+        );
+
+        if (!isAutomating) {
+          manualRecoveryInFlight = false;
+          return;
+        }
+
+        if (checkForQuizEnd()) {
+          stopAutomation("Quiz completed - all questions answered");
+          return;
+        }
+
+        if (transitioned) {
+          clearManualRecoveryState();
+          scheduleCheckForNextStep(0, "manual_recovery_auto_advanced");
+          return;
+        }
+      } catch (error) {
+        console.warn(LOG_PREFIX, "Manual recovery auto-advance failed", error);
+      }
+
+      manualRecoveryInFlight = false;
+    })();
+  }, READINESS_POLL_INTERVAL_MS);
+}
+
 function setupMessageListener() {
   if (messageListener) {
     chrome.runtime.onMessage.removeListener(messageListener);
@@ -448,6 +643,7 @@ function checkForQuizEnd() {
 
 function stopAutomation(reason = "Quiz completed") {
   isAutomating = false;
+  clearManualRecoveryState();
   pendingQuestionId = null;
   pendingAdvancePerf = null;
   lastDispatchedQuestionSignature = "";
@@ -484,6 +680,7 @@ function stopAutomation(reason = "Quiz completed") {
 
 function checkForNextStep(trigger = "direct") {
   if (!isAutomating) return;
+  if (isWaitingForManualRecovery) return;
   if (isCheckingNextStep) {
     scheduleCheckForNextStep(0, `${trigger}_dedupe`);
     return;
@@ -739,7 +936,15 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
     if (!answerApplication.applied) {
       console.warn(LOG_PREFIX, "Unable to apply answer; refusing to advance", answer);
       if (isAutomating) {
-        stopAutomation("Could not apply answer reliably. Paused to avoid skipping.");
+        const failureSnapshot = getQuizStateSnapshot();
+        pauseForManualRecovery({
+          answer,
+          reason: "Could not apply answer reliably. Paused to avoid skipping.",
+          questionType:
+            answerApplication.type || failureSnapshot.questionType || "unknown",
+          preApplyFingerprint,
+          questionSignature: failureSnapshot.signature || "",
+        });
       }
       return;
     }
@@ -768,7 +973,15 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
       answerApplication = applyQuizAnswer(answer);
       if (!answerApplication.applied) {
         if (isAutomating) {
-          stopAutomation("Could not re-apply answer reliably. Paused to avoid skipping.");
+          const failureSnapshot = getQuizStateSnapshot();
+          pauseForManualRecovery({
+            answer,
+            reason: "Could not re-apply answer reliably. Paused to avoid skipping.",
+            questionType:
+              answerApplication.type || failureSnapshot.questionType || "unknown",
+            preApplyFingerprint,
+            questionSignature: failureSnapshot.signature || "",
+          });
         }
         return;
       }
