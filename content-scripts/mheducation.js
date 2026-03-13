@@ -11,6 +11,7 @@ const PERF_LOGGING_ENABLED = true;
 const READINESS_POLL_INTERVAL_MS = 60;
 const NEXT_STEP_RETRY_DELAY_MS = 240;
 const QUESTION_TRANSITION_TIMEOUT_MS = 4500;
+const POST_ANSWER_PROGRESS_TIMEOUT_MS = 3500;
 let scheduledNextStepTimeoutId = null;
 let isCheckingNextStep = false;
 const questionPerfMarks = new Map();
@@ -2175,30 +2176,55 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
     }
 
     if (isAutomating) {
+      let progressionStage = "wait_confidence_or_ready";
       try {
-        const confidenceButton = await waitForEnabledElement(
-          '[data-automation-id="confidence-buttons--high_confidence"]',
-          10000
-        );
-        confidenceButton.click();
-        const confidenceClickedAt = Date.now();
+        const readinessState = await waitForCondition(() => {
+          const liveContainer = document.querySelector(".probe-container");
+          if (!liveContainer) return null;
 
-        if (activeQuestionId) {
-          const perfEntry = markQuestionPerf(
-            activeQuestionId,
-            "confidenceClickedAt",
-            confidenceClickedAt
+          const confidenceButton = document.querySelector(
+            '[data-automation-id="confidence-buttons--high_confidence"]'
           );
-          if (perfEntry?.answerAppliedAt) {
-            logPerf(
-              `${activeQuestionId} answerApplied->confidence ${
-                confidenceClickedAt - perfEntry.answerAppliedAt
-              }ms`
+          if (confidenceButton && !isElementDisabled(confidenceButton)) {
+            return { type: "confidence", button: confidenceButton };
+          }
+
+          const nextButton = getNextButton();
+          const hasCorrectness = Boolean(
+            liveContainer.querySelector(
+              ".awd-probe-correctness.correct, .awd-probe-correctness.incorrect, .correct-answer-container"
+            )
+          );
+
+          if (hasCorrectness || (nextButton && !isElementDisabled(nextButton))) {
+            return { type: "ready_without_confidence" };
+          }
+
+          return null;
+        }, POST_ANSWER_PROGRESS_TIMEOUT_MS);
+
+        if (readinessState?.type === "confidence" && readinessState.button) {
+          readinessState.button.click();
+          const confidenceClickedAt = Date.now();
+
+          if (activeQuestionId) {
+            const perfEntry = markQuestionPerf(
+              activeQuestionId,
+              "confidenceClickedAt",
+              confidenceClickedAt
             );
+            if (perfEntry?.answerAppliedAt) {
+              logPerf(
+                `${activeQuestionId} answerApplied->confidence ${
+                  confidenceClickedAt - perfEntry.answerAppliedAt
+                }ms`
+              );
+            }
           }
         }
 
         try {
+          progressionStage = "wait_post_confidence_readiness";
           await waitForCondition(() => {
             const liveContainer = document.querySelector(".probe-container");
             if (!liveContainer) return false;
@@ -2231,7 +2257,11 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
         }
 
         const transitionSnapshot = getQuestionTransitionSnapshot(latestContainer);
-        const nextButton = await waitForEnabledElement(".next-button", 10000);
+        progressionStage = "wait_next_button";
+        const nextButton = await waitForEnabledElement(
+          ".next-button",
+          POST_ANSWER_PROGRESS_TIMEOUT_MS
+        );
         nextButton.click();
         const nextClickedAt = Date.now();
 
@@ -2254,16 +2284,31 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
           };
         }
 
+        progressionStage = "wait_question_transition";
         await waitForQuestionTransition(
           transitionSnapshot,
           QUESTION_TRANSITION_TIMEOUT_MS
         );
         scheduleCheckForNextStep(0, "post_answer_next");
       } catch (error) {
-        console.error("Automation error:", error);
-        isAutomating = false;
-        clearAutomationRuntimeState();
-        clearMatchingPauseWatcher();
+        console.warn(
+          LOG_PREFIX,
+          `Progression step failed at ${progressionStage}; attempting recovery`,
+          activeQuestionId,
+          error
+        );
+
+        if (isAutomating) {
+          const liveContainer = document.querySelector(".probe-container");
+          if (liveContainer && advanceCompletedQuestionIfNeeded(liveContainer)) {
+            return;
+          }
+
+          scheduleCheckForNextStep(
+            NEXT_STEP_RETRY_DELAY_MS,
+            "post_response_recovery"
+          );
+        }
       }
     }
   } catch (e) {
