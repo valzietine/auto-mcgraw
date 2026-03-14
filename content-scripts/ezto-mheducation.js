@@ -12,10 +12,12 @@ const READINESS_POLL_INTERVAL_MS = 60;
 const NEXT_STEP_RETRY_DELAY_MS = 220;
 const QUIZ_TRANSITION_TIMEOUT_MS = 5000;
 const QUIZ_TRANSITION_STABLE_WINDOW_MS = 650;
+const FINAL_POSITION_FALLBACK_NEXT_WAIT_TIMEOUT_MS = 2500;
 const DISPATCH_SIGNATURE_COOLDOWN_MS = 1800;
 const ANSWER_COMMIT_TIMEOUT_MS = 3500;
 const ANSWER_COMMIT_STABLE_WINDOW_MS = 220;
 const SAME_PROGRESS_SIGNATURE_DRIFT_WARN_THRESHOLD = 3;
+const LAST_QUESTION_CUE_TEXT = "this is the last question in the assignment";
 let scheduledNextStepTimeoutId = null;
 let isCheckingNextStep = false;
 const questionPerfMarks = new Map();
@@ -360,6 +362,40 @@ function getQuizStateSnapshot() {
   };
 }
 
+function isSubmissionModalActive() {
+  return Boolean(
+    document.querySelector(
+      '#hand-in[aria-hidden="false"], #successful-submission[aria-hidden="false"]'
+    )
+  );
+}
+
+function isAtOrPastFinalQuestion(snapshot = getQuizStateSnapshot()) {
+  return (
+    Number.isInteger(snapshot?.progressCurrent) &&
+    Number.isInteger(snapshot?.progressTotal) &&
+    snapshot.progressCurrent >= snapshot.progressTotal
+  );
+}
+
+function hasLastQuestionCueText() {
+  return Array.from(document.querySelectorAll(".footer .t-hidden")).some((node) =>
+    normalizeQuizText(node.textContent).toLowerCase().includes(LAST_QUESTION_CUE_TEXT)
+  );
+}
+
+function isTerminalFinalQuestionState(snapshot = getQuizStateSnapshot()) {
+  return (
+    isAtOrPastFinalQuestion(snapshot) &&
+    !isNextQuizButtonEnabled() &&
+    hasLastQuestionCueText()
+  );
+}
+
+function isFinalPositionWithoutEnabledNext(snapshot = getQuizStateSnapshot()) {
+  return isAtOrPastFinalQuestion(snapshot) && !isNextQuizButtonEnabled();
+}
+
 function isQuizStateDispatchReady(snapshot) {
   if (!snapshot) return false;
   if (!snapshot.questionText || !snapshot.questionType) return false;
@@ -637,7 +673,18 @@ function pauseForManualRecovery(context) {
     const fingerprintChanged =
       getAnswerCommitFingerprint() !== manualRecoveryContext.preApplyFingerprint;
     const nextEnabled = isNextQuizButtonEnabled();
-    if (!fingerprintChanged || !nextEnabled) {
+    if (!fingerprintChanged) {
+      return;
+    }
+
+    if (!nextEnabled) {
+      if (
+        isTerminalFinalQuestionState(currentSnapshot) ||
+        isFinalPositionWithoutEnabledNext(currentSnapshot)
+      ) {
+        clearManualRecoveryState();
+        stopAutomation("Quiz completed - all questions answered");
+      }
       return;
     }
 
@@ -769,6 +816,10 @@ function isQuizPage() {
 }
 
 function isLikelyQuizCompletedState() {
+  if (isSubmissionModalActive()) {
+    return true;
+  }
+
   const snapshot = getQuizStateSnapshot();
 
   if (
@@ -1203,9 +1254,21 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
     }
 
     if (isAutomating) {
-      const previousSnapshot = getQuizStateSnapshot();
+      const postCommitSnapshot = getQuizStateSnapshot();
+      if (isTerminalFinalQuestionState(postCommitSnapshot)) {
+        stopAutomation("Quiz completed - all questions answered");
+        return;
+      }
+
+      const shouldUseFinalPositionFallbackWait =
+        isFinalPositionWithoutEnabledNext(postCommitSnapshot);
+      const nextButtonWaitTimeout = shouldUseFinalPositionFallbackWait
+        ? FINAL_POSITION_FALLBACK_NEXT_WAIT_TIMEOUT_MS
+        : 12000;
+      const previousSnapshot = postCommitSnapshot;
+
       try {
-        const nextButton = await waitForNextQuizButton(12000);
+        const nextButton = await waitForNextQuizButton(nextButtonWaitTimeout);
         nextButton.click();
         const nextClickedAt = Date.now();
 
@@ -1237,7 +1300,13 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
 
         scheduleCheckForNextStep(0, "post_answer_next");
       } catch (error) {
-        if (isLikelyQuizCompletedState()) {
+        const latestSnapshot = getQuizStateSnapshot();
+        if (
+          isLikelyQuizCompletedState() ||
+          isTerminalFinalQuestionState(latestSnapshot) ||
+          (shouldUseFinalPositionFallbackWait &&
+            isFinalPositionWithoutEnabledNext(latestSnapshot))
+        ) {
           stopAutomation("Quiz completed - all questions answered");
           return;
         }
