@@ -19,27 +19,17 @@
 ## Fork Notice (`dev` branch)
 
 This repository is a **fork** of the original Auto-McGraw project by `GooglyBlox`.
-The sections below keep the original usage documentation, and this section tracks fork-specific changes merged into `dev`.
+The sections below keep the original usage documentation, and this section tracks major fork-specific differences on `dev`.
 
-### Changes merged from `pr/deepseek-fix`
+As of **March 14, 2026**, `dev` is **24 commits ahead** and **17 commits behind** `upstream/main`.
 
-- Fixed DeepSeek tab discovery and message routing so both `chat.deepseek.com` and `deepseek.chat` are handled more reliably.
-- Improved DeepSeek content script selectors for:
-  - assistant response detection
-  - chat input detection
-  - send button detection
-- Improved settings/background detection for DeepSeek availability checks.
-- Added `https://chat.deepseek.com/*` to extension host permissions.
+### Current major changes from `upstream/main`
 
-### Changes merged from `quizzes`
-
-- Added quiz support for `https://ezto.mheducation.com/*`.
-- Added a dedicated quiz automation content script: `content-scripts/ezto-mheducation.js`.
-- Updated background tab detection and tab focus logic to work with both:
-  - `learning.mheducation.com`
-  - `ezto.mheducation.com`
-- Updated manifest entries for the new quiz domain/content script and `api.github.com` host access.
-- Extension manifest version in this branch is `2.0`.
+- Expanded EZTO automation support (`https://ezto.mheducation.com/*`) with a dedicated script (`content-scripts/ezto-mheducation.js`), including full click-and-drag handling, retry/verification logic, manual-assist pause/resume, improved activity-page answer reliability, and improved end-of-quiz detection.
+- Expanded SmartBook question support in `content-scripts/mheducation.js` with ordering automation and matching automation/fallback handling.
+- Hardened reliability and recovery across flows with request IDs, watchdog retries, transition/commit guards, and manual recovery pause logic to reduce stalls and recover safely.
+- Hardened chatbot tab routing/recovery logic, including improved DeepSeek support for both `chat.deepseek.com` and `deepseek.chat` in background/content-script/manifest handling.
+- Added HTML selector-reference snapshots used for extraction/selector maintenance (`*_html_reference.html` and `mheducation_html_references/*`) plus `AGENTS.md` mappings for this workflow.
 
 ---
 
