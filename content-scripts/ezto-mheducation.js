@@ -38,6 +38,8 @@ const CLICK_AND_DRAG_IFRAME_SELECTOR =
 const CLICK_AND_DRAG_CATEGORY_COUNT_SUFFIX_REGEX = /\s*\(\d+\s*\/\s*\d+\)\s*$/;
 const CLICK_AND_DRAG_MOVE_MAX_PASSES = 3;
 const CLICK_AND_DRAG_MOVE_MAX_KEYBOARD_STEPS = 8;
+const MULTIPLE_CHOICE_MATCH_THRESHOLD = 0.78;
+const MULTIPLE_CHOICE_MATCH_MARGIN = 0.08;
 
 function createQuestionId() {
   questionSequence += 1;
@@ -163,6 +165,214 @@ function normalizeQuizText(text) {
     .replace(/\u00a0/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function stripMultipleChoiceOptionPrefix(text) {
+  return normalizeQuizText(text)
+    .replace(/^option\s+\d+\s*[:.)-]\s*/i, "")
+    .replace(/^(?:\(?[a-z]\)?|\d{1,2})\s*[:.)-]\s*/i, "")
+    .trim();
+}
+
+function normalizeMultipleChoiceComparisonText(text) {
+  return stripMultipleChoiceOptionPrefix(text)
+    .toLowerCase()
+    .replace(/[’‘]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/&/g, " and ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokenizeComparisonText(text) {
+  const normalized = normalizeMultipleChoiceComparisonText(text);
+  if (!normalized) return [];
+  return normalized.split(" ").filter(Boolean);
+}
+
+function scoreTextTokenOverlap(referenceText, candidateText) {
+  const referenceTokens = tokenizeComparisonText(referenceText);
+  const candidateTokens = tokenizeComparisonText(candidateText);
+  if (!referenceTokens.length || !candidateTokens.length) {
+    return 0;
+  }
+
+  const referenceSet = new Set(referenceTokens);
+  const candidateSet = new Set(candidateTokens);
+  let overlap = 0;
+  referenceSet.forEach((token) => {
+    if (candidateSet.has(token)) {
+      overlap += 1;
+    }
+  });
+
+  if (!overlap) {
+    return 0;
+  }
+
+  const precision = overlap / candidateSet.size;
+  const recall = overlap / referenceSet.size;
+  return (2 * precision * recall) / (precision + recall);
+}
+
+function coerceMultipleChoiceAnswerText(answer) {
+  if (typeof answer === "string") return answer;
+
+  if (Array.isArray(answer)) {
+    const firstString = answer.find(
+      (entry) => typeof entry === "string" && normalizeQuizText(entry)
+    );
+    return firstString || "";
+  }
+
+  if (answer && typeof answer === "object") {
+    const candidateFields = [
+      "answer",
+      "choice",
+      "option",
+      "text",
+      "label",
+      "value",
+      "match",
+    ];
+
+    for (const field of candidateFields) {
+      const value = answer[field];
+      if (typeof value === "string" && normalizeQuizText(value)) {
+        return value;
+      }
+
+      if (Array.isArray(value)) {
+        const firstString = value.find(
+          (entry) => typeof entry === "string" && normalizeQuizText(entry)
+        );
+        if (firstString) return firstString;
+      }
+    }
+  }
+
+  if (typeof answer === "number") return String(answer);
+  return normalizeQuizText(answer);
+}
+
+function parseMultipleChoiceAnswerIndex(answerText, optionCount) {
+  if (!answerText || optionCount <= 0) return -1;
+  const normalized = normalizeQuizText(answerText);
+  if (!normalized) return -1;
+
+  const numericMatch = normalized.match(/^(?:option\s*)?(\d{1,2})$/i);
+  if (numericMatch) {
+    const index = Number(numericMatch[1]) - 1;
+    if (index >= 0 && index < optionCount) {
+      return index;
+    }
+  }
+
+  const letterMatch = normalized.match(/^(?:option\s*)?([a-z])$/i);
+  if (letterMatch) {
+    const index = letterMatch[1].toLowerCase().charCodeAt(0) - 97;
+    if (index >= 0 && index < optionCount) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function getMultipleChoiceOptionModels() {
+  const labels = Array.from(
+    document.querySelectorAll(".answers--mc .answer__label--mc")
+  );
+  const radioButtons = Array.from(
+    document.querySelectorAll('.answers--mc input[type="radio"]')
+  );
+
+  return labels
+    .map((label, index) => {
+      const rawText = normalizeQuizText(label.textContent);
+      const text = stripMultipleChoiceOptionPrefix(rawText);
+      const input =
+        label.querySelector('input[type="radio"]') || radioButtons[index] || null;
+
+      return {
+        index,
+        label,
+        input,
+        rawText,
+        text,
+        comparisonText: normalizeMultipleChoiceComparisonText(text),
+      };
+    })
+    .filter((option) => option.text);
+}
+
+function resolveMultipleChoiceAnswerOption(answer, optionModels) {
+  if (!Array.isArray(optionModels) || optionModels.length === 0) {
+    return null;
+  }
+
+  const answerText = coerceMultipleChoiceAnswerText(answer);
+  if (!answerText) return null;
+
+  const indexedMatch = parseMultipleChoiceAnswerIndex(
+    answerText,
+    optionModels.length
+  );
+  if (indexedMatch >= 0) {
+    return optionModels[indexedMatch] || null;
+  }
+
+  const normalizedAnswer = normalizeMultipleChoiceComparisonText(answerText);
+  if (!normalizedAnswer) return null;
+
+  let best = null;
+  let runnerUp = null;
+
+  optionModels.forEach((option) => {
+    const candidate = option.comparisonText;
+    if (!candidate) return;
+
+    let score = 0;
+
+    if (candidate === normalizedAnswer) {
+      score = 1;
+    } else if (
+      candidate.includes(normalizedAnswer) ||
+      normalizedAnswer.includes(candidate)
+    ) {
+      const shorterLength = Math.min(candidate.length, normalizedAnswer.length);
+      const longerLength = Math.max(candidate.length, normalizedAnswer.length);
+      if (shorterLength >= 8 && longerLength > 0) {
+        score = shorterLength / longerLength;
+      }
+    }
+
+    score = Math.max(score, scoreTextTokenOverlap(candidate, normalizedAnswer));
+
+    const scored = { option, score };
+    if (!best || scored.score > best.score) {
+      runnerUp = best;
+      best = scored;
+      return;
+    }
+
+    if (!runnerUp || scored.score > runnerUp.score) {
+      runnerUp = scored;
+    }
+  });
+
+  if (!best) return null;
+
+  const margin = best.score - (runnerUp?.score || 0);
+  if (
+    best.score >= MULTIPLE_CHOICE_MATCH_THRESHOLD &&
+    (margin >= MULTIPLE_CHOICE_MATCH_MARGIN || best.score >= 0.96)
+  ) {
+    return best.option;
+  }
+
+  return null;
 }
 
 function getClickAndDragIframeElement() {
@@ -2356,13 +2566,7 @@ function parseQuestion() {
 
   let options = [];
   if (questionType === "multiple_choice") {
-    const optionElements = document.querySelectorAll(
-      ".answers--mc .answer__label--mc"
-    );
-    options = Array.from(optionElements).map((el) => {
-      const textContent = el.textContent.trim();
-      return textContent.replace(/^[a-z]\s+/, "");
-    });
+    options = getMultipleChoiceOptionModels().map((option) => option.text);
   } else if (questionType === "true_false") {
     options = ["True", "False"];
   } else if (questionType === "click_and_drag") {
@@ -2625,39 +2829,75 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
 }
 
 function handleMultipleChoiceAnswer(answer) {
+  const optionModels = getMultipleChoiceOptionModels();
+  const targetOption = resolveMultipleChoiceAnswerOption(answer, optionModels);
+  const targetInput = targetOption?.input || null;
+  const targetLabel = targetOption?.label || null;
+  const markerNode = targetInput || targetLabel;
+
+  if (!targetOption || !markerNode) {
+    console.warn(LOG_PREFIX, "No multiple-choice match for answer", {
+      answer,
+      options: optionModels.map((option) => option.text),
+    });
+    return {
+      applied: false,
+      type: "multiple_choice",
+      verify: () => false,
+      manualRecoveryReason:
+        "Could not match the AI response to a visible multiple-choice option. Paused to avoid skipping.",
+      manualRecoveryAnswer: answer,
+    };
+  }
+
   const radioButtons = document.querySelectorAll(
     '.answers--mc input[type="radio"]'
   );
-  const labels = document.querySelectorAll(".answers--mc .answer__label--mc");
+  radioButtons.forEach((input) =>
+    input.removeAttribute("data-automcgraw-selected")
+  );
+  document
+    .querySelectorAll(".answers--mc .answer__label--mc[data-automcgraw-selected='true']")
+    .forEach((node) => node.removeAttribute("data-automcgraw-selected"));
 
-  for (let i = 0; i < labels.length; i++) {
-    const labelText = labels[i].textContent.trim().replace(/^[a-z]\s+/, "");
-
-    if (
-      labelText === answer ||
-      labelText.replace(/\.$/, "") === answer.replace(/\.$/, "") ||
-      labelText.includes(answer) ||
-      answer.includes(labelText)
-    ) {
-      const targetInput = radioButtons[i];
-      radioButtons.forEach((input) =>
-        input.removeAttribute("data-automcgraw-selected")
-      );
-      targetInput.click();
-      targetInput.setAttribute("data-automcgraw-selected", "true");
-      console.log("Selected option:", labelText);
-      return {
-        applied: true,
-        type: "multiple_choice",
-        verify: () => Boolean(targetInput && targetInput.isConnected && targetInput.checked),
-      };
-    }
+  if (targetInput && !targetInput.checked) {
+    targetInput.click();
+  }
+  if (targetLabel && (!targetInput || !targetInput.checked)) {
+    targetLabel.click();
   }
 
+  markerNode.setAttribute("data-automcgraw-selected", "true");
+  console.log("Selected option:", targetOption.text);
+
   return {
-    applied: false,
+    applied: true,
     type: "multiple_choice",
-    verify: () => false,
+    verify: () => {
+      if (targetInput && targetInput.isConnected && targetInput.checked) {
+        return true;
+      }
+
+      if (
+        markerNode &&
+        markerNode.isConnected &&
+        markerNode.getAttribute("data-automcgraw-selected") === "true"
+      ) {
+        return true;
+      }
+
+      if (targetLabel && targetLabel.isConnected) {
+        const className = targetLabel.className || "";
+        if (/selected|active|checked|is-selected|is-active/i.test(className)) {
+          return true;
+        }
+      }
+
+      const anyChecked = document.querySelector(
+        '.answers--mc input[type="radio"]:checked'
+      );
+      return Boolean(anyChecked);
+    },
   };
 }
 
