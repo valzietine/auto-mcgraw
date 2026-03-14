@@ -31,6 +31,9 @@ let isWaitingForManualRecovery = false;
 let manualRecoveryIntervalId = null;
 let manualRecoveryInFlight = false;
 let manualRecoveryContext = null;
+const CLICK_AND_DRAG_IFRAME_SELECTOR =
+  "iframe.external[src*='clickanddrag'], iframe.external[src*='/ext/common/clickanddrag/'], iframe[title*='Assessment Tool'][src*='clickanddrag']";
+const CLICK_AND_DRAG_CATEGORY_COUNT_SUFFIX_REGEX = /\s*\(\d+\s*\/\s*\d+\)\s*$/;
 
 function createQuestionId() {
   questionSequence += 1;
@@ -151,11 +154,187 @@ function scheduleCheckForNextStep(delayMs = 0, reason = "") {
   }, delayMs);
 }
 
-function getQuizStateSnapshot() {
-  const questionElement = document.querySelector(".question");
-  const questionText =
-    questionElement?.textContent?.replace(/\s+/g, " ").trim() || "";
+function normalizeQuizText(text) {
+  return String(text || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
+function getClickAndDragIframeElement() {
+  return document.querySelector(CLICK_AND_DRAG_IFRAME_SELECTOR);
+}
+
+function getClickAndDragDocument() {
+  const iframe = getClickAndDragIframeElement();
+  if (!iframe) return null;
+
+  try {
+    return iframe.contentDocument || iframe.contentWindow?.document || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function getClickAndDragQuestionText() {
+  const worksheetMain = document.querySelector(".worksheet__main");
+  if (worksheetMain) {
+    const textParts = Array.from(worksheetMain.querySelectorAll("h1, h2, h3, p"))
+      .map((node) => normalizeQuizText(node.textContent))
+      .filter(Boolean);
+    if (textParts.length > 0) {
+      return textParts.join("\n");
+    }
+  }
+
+  const fallbackWrap = document.querySelector(".question-wrap");
+  return normalizeQuizText(fallbackWrap?.textContent || "");
+}
+
+function normalizeClickAndDragCategoryText(text) {
+  return normalizeQuizText(text).replace(
+    CLICK_AND_DRAG_CATEGORY_COUNT_SUFFIX_REGEX,
+    ""
+  );
+}
+
+function extractClickAndDragLabels(doc = getClickAndDragDocument()) {
+  if (!doc) return [];
+
+  const labelsById = new Map();
+  const labelNodes = Array.from(doc.querySelectorAll(".label-box[labelid]"));
+
+  labelNodes.forEach((labelNode) => {
+    const labelId =
+      labelNode.getAttribute("labelid") ||
+      labelNode.getAttribute("id") ||
+      labelNode.id ||
+      "";
+    const labelText = normalizeQuizText(
+      labelNode.querySelector(".label-text")?.textContent || labelNode.textContent
+    );
+
+    if (!labelText) return;
+    if (labelId && labelsById.has(labelId)) return;
+
+    labelsById.set(labelId || `${labelsById.size}_${labelText}`, labelText);
+  });
+
+  return Array.from(labelsById.values());
+}
+
+function extractClickAndDragCategories(doc = getClickAndDragDocument()) {
+  if (!doc) return [];
+
+  const categories = Array.from(
+    doc.querySelectorAll("#js-groupActivityContainer .groups h3")
+  )
+    .map((node) => normalizeClickAndDragCategoryText(node.textContent))
+    .filter(Boolean);
+
+  return Array.from(new Set(categories));
+}
+
+function getClickAndDragPlacementFingerprint() {
+  const doc = getClickAndDragDocument();
+  if (!doc) return "click_and_drag_unavailable";
+
+  const remainingLabelIds = Array.from(
+    doc.querySelectorAll("#label-list .label-box[labelid]")
+  )
+    .map((node) => node.getAttribute("labelid"))
+    .filter(Boolean)
+    .sort((a, b) => Number(a) - Number(b));
+
+  const dropZoneStates = Array.from(doc.querySelectorAll(".drop-zone[dropzoneid]"))
+    .map((zone) => {
+      const dropzoneId = zone.getAttribute("dropzoneid") || zone.id || "unknown";
+      const placedLabelIds = Array.from(zone.querySelectorAll(".label-box[labelid]"))
+        .map((label) => label.getAttribute("labelid"))
+        .filter(Boolean)
+        .sort((a, b) => Number(a) - Number(b));
+      return `${dropzoneId}:${placedLabelIds.join(",")}`;
+    })
+    .sort();
+
+  return `remaining:${remainingLabelIds.join(",")}||zones:${dropZoneStates.join(
+    ";"
+  )}`;
+}
+
+function getQuizQuestionType() {
+  if (document.querySelector(".answers-wrap.multiple-choice")) {
+    return "multiple_choice";
+  }
+
+  if (document.querySelector(".answers-wrap.boolean")) {
+    return "true_false";
+  }
+
+  if (document.querySelector(".answers-wrap.input-response")) {
+    return "fill_in_the_blank";
+  }
+
+  if (getClickAndDragIframeElement()) {
+    return "click_and_drag";
+  }
+
+  return "";
+}
+
+function getQuestionTextForType(questionType) {
+  if (!questionType) return "";
+
+  if (questionType === "click_and_drag") {
+    return getClickAndDragQuestionText();
+  }
+
+  const questionElement = document.querySelector(".question");
+  if (!questionElement) return "";
+
+  if (questionType === "fill_in_the_blank") {
+    const questionClone = questionElement.cloneNode(true);
+    const blankSpans = questionClone.querySelectorAll('span[aria-hidden="true"]');
+    blankSpans.forEach((span) => {
+      if (span.textContent.includes("_")) {
+        span.textContent = "[BLANK]";
+      }
+    });
+
+    const hiddenSpans = questionClone.querySelectorAll(
+      'span[style*="position: absolute"]'
+    );
+    hiddenSpans.forEach((span) => span.remove());
+    return normalizeQuizText(questionClone.textContent);
+  }
+
+  return normalizeQuizText(questionElement.textContent);
+}
+
+function getOptionCountForType(questionType) {
+  if (questionType === "multiple_choice") {
+    return document.querySelectorAll(".answers--mc .answer__label--mc").length;
+  }
+
+  if (questionType === "true_false") {
+    return document.querySelectorAll(".answer--boolean").length;
+  }
+
+  if (questionType === "fill_in_the_blank") {
+    return document.querySelectorAll(".answer--input__input").length;
+  }
+
+  if (questionType === "click_and_drag") {
+    const doc = getClickAndDragDocument();
+    const labels = extractClickAndDragLabels(doc);
+    const categories = extractClickAndDragCategories(doc);
+    return labels.length + categories.length;
+  }
+
+  return 0;
+}
+
+function getQuizStateSnapshot() {
   const progressText =
     document
       .querySelector(".footer__progress__heading")
@@ -166,19 +345,9 @@ function getQuizStateSnapshot() {
   const progressCurrent = progressMatch ? parseInt(progressMatch[1], 10) : null;
   const progressTotal = progressMatch ? parseInt(progressMatch[2], 10) : null;
 
-  let questionType = "";
-  let optionCount = 0;
-
-  if (document.querySelector(".answers-wrap.multiple-choice")) {
-    questionType = "multiple_choice";
-    optionCount = document.querySelectorAll(".answers--mc .answer__label--mc").length;
-  } else if (document.querySelector(".answers-wrap.boolean")) {
-    questionType = "true_false";
-    optionCount = document.querySelectorAll(".answer--boolean").length;
-  } else if (document.querySelector(".answers-wrap.input-response")) {
-    questionType = "fill_in_the_blank";
-    optionCount = document.querySelectorAll(".answer--input__input").length;
-  }
+  const questionType = getQuizQuestionType();
+  const questionText = getQuestionTextForType(questionType);
+  const optionCount = getOptionCountForType(questionType);
 
   return {
     questionText,
@@ -205,6 +374,13 @@ function isQuizStateDispatchReady(snapshot) {
 
   if (snapshot.questionType === "fill_in_the_blank") {
     return snapshot.optionCount > 0;
+  }
+
+  if (snapshot.questionType === "click_and_drag") {
+    const doc = getClickAndDragDocument();
+    const labels = extractClickAndDragLabels(doc);
+    const categories = extractClickAndDragCategories(doc);
+    return labels.length > 0 && categories.length > 0;
   }
 
   return false;
@@ -248,7 +424,9 @@ function getAnswerCommitFingerprint() {
     .map((node, index) => `${node.textContent?.trim() || node.id || "node"}:${index}`)
     .join("|");
 
-  return `${checkedInputs}||${inputValues}||${pressedButtons}||${automationMarkers}`;
+  const clickAndDragState = getClickAndDragPlacementFingerprint();
+
+  return `${checkedInputs}||${inputValues}||${pressedButtons}||${automationMarkers}||${clickAndDragState}`;
 }
 
 function getNextQuizButton() {
@@ -384,6 +562,10 @@ function getManualRecoveryInstructions(questionType) {
 
   if (questionType === "fill_in_the_blank") {
     return "Type the suggested answer into the blank exactly as shown.";
+  }
+
+  if (questionType === "click_and_drag") {
+    return "Drag each label to the matching drop zone using the suggested 'Label -> Category' mapping, then complete the question. Auto-McGraw will advance after it detects your changes.";
   }
 
   return "Apply the suggested answer manually on the current question.";
@@ -581,11 +763,8 @@ function setupMessageListener() {
 }
 
 function isQuizPage() {
-  return (
-    document.querySelector(".question") &&
-    (document.querySelector(".answers-wrap.multiple-choice") ||
-      document.querySelector(".answers-wrap.boolean") ||
-      document.querySelector(".answers-wrap.input-response"))
+  return Boolean(
+    document.querySelector(".footer__progress__heading") && getQuizQuestionType()
   );
 }
 
@@ -833,16 +1012,14 @@ function checkForNextStep(trigger = "direct") {
 }
 
 function parseQuestion() {
-  const questionElement = document.querySelector(".question");
-  if (!questionElement) {
+  const questionType = getQuizQuestionType();
+  if (!questionType) {
+    console.log("Unknown question type");
     return null;
   }
 
-  let questionType = "";
   let options = [];
-
-  if (document.querySelector(".answers-wrap.multiple-choice")) {
-    questionType = "multiple_choice";
+  if (questionType === "multiple_choice") {
     const optionElements = document.querySelectorAll(
       ".answers--mc .answer__label--mc"
     );
@@ -850,38 +1027,19 @@ function parseQuestion() {
       const textContent = el.textContent.trim();
       return textContent.replace(/^[a-z]\s+/, "");
     });
-  } else if (document.querySelector(".answers-wrap.boolean")) {
-    questionType = "true_false";
+  } else if (questionType === "true_false") {
     options = ["True", "False"];
-  } else if (document.querySelector(".answers-wrap.input-response")) {
-    questionType = "fill_in_the_blank";
-    options = [];
-  } else {
-    console.log("Unknown question type");
-    return null;
+  } else if (questionType === "click_and_drag") {
+    const iframeDoc = getClickAndDragDocument();
+    options = {
+      labels: extractClickAndDragLabels(iframeDoc),
+      categories: extractClickAndDragCategories(iframeDoc),
+    };
   }
 
-  let questionText = "";
-  if (questionType === "fill_in_the_blank") {
-    const questionClone = questionElement.cloneNode(true);
-
-    const blankSpans = questionClone.querySelectorAll(
-      'span[aria-hidden="true"]'
-    );
-    blankSpans.forEach((span) => {
-      if (span.textContent.includes("_")) {
-        span.textContent = "[BLANK]";
-      }
-    });
-
-    const hiddenSpans = questionClone.querySelectorAll(
-      'span[style*="position: absolute"]'
-    );
-    hiddenSpans.forEach((span) => span.remove());
-
-    questionText = questionClone.textContent.trim();
-  } else {
-    questionText = questionElement.textContent.trim();
+  const questionText = getQuestionTextForType(questionType);
+  if (!questionText) {
+    return null;
   }
 
   return {
@@ -1261,6 +1419,14 @@ function handleFillInTheBlankAnswer(answer) {
   };
 }
 
+function handleClickAndDragAnswer() {
+  return {
+    applied: false,
+    type: "click_and_drag",
+    verify: () => false,
+  };
+}
+
 function applyQuizAnswer(answer) {
   if (document.querySelector(".answers-wrap.multiple-choice")) {
     return handleMultipleChoiceAnswer(answer);
@@ -1272,6 +1438,10 @@ function applyQuizAnswer(answer) {
 
   if (document.querySelector(".answers-wrap.input-response")) {
     return handleFillInTheBlankAnswer(answer);
+  }
+
+  if (getQuizQuestionType() === "click_and_drag") {
+    return handleClickAndDragAnswer(answer);
   }
 
   return {

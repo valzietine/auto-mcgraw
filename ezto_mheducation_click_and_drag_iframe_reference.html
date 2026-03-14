@@ -1,0 +1,933 @@
+<html lang="en" data-darkreader-mode="dynamic" data-darkreader-scheme="dark" data-darkreader-proxy-injected="true"><head><style class="darkreader darkreader--fallback" media="screen"></style><style class="darkreader darkreader--user-agent" media="screen">@layer {
+html {
+color-scheme: dark !important;
+}
+iframe {
+color-scheme: dark !important;
+}
+html, body {
+border-color: var(--darkreader-border-4c4c4c, #736b5e);
+color: var(--darkreader-text-000000, #e8e6e3);
+}
+a {
+color: var(--darkreader-text-0040ff, #3391ff);
+}
+table {
+border-color: var(--darkreader-border-808080, #545b5e);
+}
+mark {
+color: var(--darkreader-text-000000, #e8e6e3);
+}
+::placeholder {
+color: var(--darkreader-text-a9a9a9, #b2aba1);
+}
+input:-webkit-autofill,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+background-color: var(--darkreader-background-faffbd, #404400) !important;
+color: var(--darkreader-text-000000, #e8e6e3) !important;
+}
+::selection {
+background-color: var(--darkreader-background-0060d4, #004daa) !important;
+color: var(--darkreader-text-ffffff, #e8e6e3) !important;
+}
+::-moz-selection {
+background-color: var(--darkreader-background-0060d4, #004daa) !important;
+color: var(--darkreader-text-ffffff, #e8e6e3) !important;
+}
+}</style><style class="darkreader darkreader--text" media="screen"></style><style class="darkreader darkreader--invert" media="screen">.jfk-bubble.gtx-bubble, .captcheck_answer_label > input + img, span#closed_text > img[src^="https://www.gstatic.com/images/branding/googlelogo"], span[data-href^="https://www.hcaptcha.com/"] > #icon, img.Wirisformula, a[data-testid="headerMediumLogo"]>svg, .d2l-navigation-link-image-container, .d2l-iframe-loading-container {
+filter: invert(100%) hue-rotate(180deg) contrast(90%) !important;
+}</style><style class="darkreader darkreader--inline" media="screen">[data-darkreader-inline-bgcolor] {
+background-color: var(--darkreader-inline-bgcolor) !important;
+}
+[data-darkreader-inline-bgimage] {
+background-image: var(--darkreader-inline-bgimage) !important;
+}
+[data-darkreader-inline-border] {
+border-color: var(--darkreader-inline-border) !important;
+}
+[data-darkreader-inline-border-bottom] {
+border-bottom-color: var(--darkreader-inline-border-bottom) !important;
+}
+[data-darkreader-inline-border-left] {
+border-left-color: var(--darkreader-inline-border-left) !important;
+}
+[data-darkreader-inline-border-right] {
+border-right-color: var(--darkreader-inline-border-right) !important;
+}
+[data-darkreader-inline-border-top] {
+border-top-color: var(--darkreader-inline-border-top) !important;
+}
+[data-darkreader-inline-boxshadow] {
+box-shadow: var(--darkreader-inline-boxshadow) !important;
+}
+[data-darkreader-inline-color] {
+color: var(--darkreader-inline-color) !important;
+}
+[data-darkreader-inline-fill] {
+fill: var(--darkreader-inline-fill) !important;
+}
+[data-darkreader-inline-stroke] {
+stroke: var(--darkreader-inline-stroke) !important;
+}
+[data-darkreader-inline-outline] {
+outline-color: var(--darkreader-inline-outline) !important;
+}
+[data-darkreader-inline-stopcolor] {
+stop-color: var(--darkreader-inline-stopcolor) !important;
+}
+[data-darkreader-inline-bg] {
+background: var(--darkreader-inline-bg) !important;
+}
+[data-darkreader-inline-border-short] {
+border: var(--darkreader-inline-border-short) !important;
+}
+[data-darkreader-inline-border-bottom-short] {
+border-bottom: var(--darkreader-inline-border-bottom-short) !important;
+}
+[data-darkreader-inline-border-left-short] {
+border-left: var(--darkreader-inline-border-left-short) !important;
+}
+[data-darkreader-inline-border-right-short] {
+border-right: var(--darkreader-inline-border-right-short) !important;
+}
+[data-darkreader-inline-border-top-short] {
+border-top: var(--darkreader-inline-border-top-short) !important;
+}
+[data-darkreader-inline-invert] {
+filter: invert(100%) hue-rotate(180deg);
+}</style><style class="darkreader darkreader--variables" media="screen">:root {
+--darkreader-neutral-background: var(--darkreader-background-ffffff, #181a1b);
+--darkreader-neutral-text: var(--darkreader-text-000000, #e8e6e3);
+--darkreader-selection-background: var(--darkreader-background-0060d4, #004daa);
+--darkreader-selection-text: var(--darkreader-text-ffffff, #e8e6e3);
+}</style><style class="darkreader darkreader--root-vars" media="screen"></style>
+<meta charset="utf-8">
+<title>Click and drag tool version 3</title>
+<base href="./">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<script async="" src="https://content.data.mheducation.com/agent/static/d873ab3e-a950-49ee-5f35-9533248a031c/pendo.js"></script><script type="text/javascript" src="./libs/jquery-1.9.1.min.js"></script>
+<script type="text/javascript" src="/EZTestOnline/ezto_ext_api.js"></script>
+<script>
+(function (apiKey) {
+(function (p, e, n, d, o) {
+var v, w, x, y, z; o = p[d] = p[d] || {}; o._q = o._q || [];
+v = ['initialize', 'identify', 'updateOptions', 'pageLoad', 'track']; for (w = 0, x = v.length; w < x; ++w)(function (m) {
+o[m] = o[m] || function () { o._q[m === v[0] ? 'unshift' : 'push']([m].concat([].slice.call(arguments, 0))); };
+})(v[w]);
+y = e.createElement(n); y.async = !0; y.src = 'https://content.data.mheducation.com/agent/static/' + apiKey + '/pendo.js';
+z = e.getElementsByTagName(n)[0]; z.parentNode.insertBefore(y, z);
+})(window, document, 'script', 'pendo');
+})('d873ab3e-a950-49ee-5f35-9533248a031c');
+</script>
+<style>
+.ahe-ui-loading-spinner {
+top: 0;
+right: 0;
+bottom: 0;
+left: 0;
+margin: auto;
+position: absolute;
+background-color: rgba(0, 33, 43, 0.6);
+}
+
+.ahe-ui-loading-spinner .loader {
+position: relative;
+top: 100%;
+transform: translateY(-100%);
+width: 100%;
+height: 100%;
+}
+
+
+
+
+
+.ahe-ui-loading-spinner .loader .circular {
+animation-duration: 2s;
+animation-iteration-count: infinite;
+animation-name: rotate;
+animation-timing-function: linear;
+bottom: 0;
+height: 75px;
+left: 0;
+margin: auto;
+position: absolute;
+right: 0;
+top: 0;
+transform-origin: center center;
+width: 75px;
+}
+
+.ahe-ui-loading-spinner .loader .circular .path {
+animation-duration: 1.5s;
+animation-iteration-count: infinite;
+animation-name: dash;
+animation-timing-function: ease-in-out;
+stroke: #e21f26;
+stroke-dasharray: 89px, 200px;
+stroke-dashoffset: 0;
+stroke-linecap: round;
+}
+
+@-webkit-keyframes rotate {
+to {
+transform: rotate(1turn)
+}
+}
+
+@keyframes rotate {
+to {
+transform: rotate(1turn)
+}
+}
+</style><style class="darkreader darkreader--sync" media="screen"></style>
+<link rel="stylesheet" href="styles.css"><style class="darkreader darkreader--sync" media="screen"></style><meta name="darkreader" content="1625c6b970df4cd7b9c9099dd9075c63"><style class="darkreader darkreader--override" media="screen">.vimvixen-hint {
+background-color: var(--darkreader-background-ffd76e, #684b00) !important;
+border-color: var(--darkreader-background-c59d00, #9e7e00) !important;
+color: var(--darkreader-text-302505, #d7d4cf) !important;
+}
+#vimvixen-console-frame {
+color-scheme: light !important;
+}
+::placeholder {
+opacity: 0.5 !important;
+}
+#edge-translate-panel-body,
+.MuiTypography-body1,
+.nfe-quote-text {
+color: var(--darkreader-neutral-text) !important;
+}
+gr-main-header {
+background-color: var(--darkreader-background-add8e6, #1b4958) !important;
+}
+.tou-z65h9k,
+.tou-mignzq,
+.tou-1b6i2ox,
+.tou-lnqlqk {
+background-color: var(--darkreader-neutral-background) !important;
+}
+.tou-75mvi {
+background-color: var(--darkreader-background-cfecf5, #0f3a47) !important;
+}
+.tou-ta9e87,
+.tou-1w3fhi0,
+.tou-1b8t2us,
+.tou-py7lfi,
+.tou-1lpmd9d,
+.tou-1frrtv8,
+.tou-17ezmgn {
+background-color: var(--darkreader-background-f5f5f5, #1e2021) !important;
+}
+.tou-uknfeu {
+background-color: var(--darkreader-background-faedda, #432c09) !important;
+}
+.tou-6i3zyv {
+background-color: var(--darkreader-background-85c3d8, #245d70) !important;
+}
+div.mermaid-viewer-control-panel .btn {
+background-color: var(--darkreader-neutral-background);
+fill: var(--darkreader-neutral-text);
+}
+svg g rect.er {
+fill: var(--darkreader-neutral-background) !important;
+}
+svg g rect.er.entityBox {
+fill: var(--darkreader-neutral-background) !important;
+}
+svg g rect.er.attributeBoxOdd {
+fill: var(--darkreader-neutral-background) !important;
+}
+svg g rect.er.attributeBoxEven {
+fill: var(--darkreader-selection-background);
+fill-opacity: 0.8 !important;
+}
+svg rect.er.relationshipLabelBox {
+fill: var(--darkreader-neutral-background) !important;
+}
+svg g g.nodes rect,
+svg g g.nodes polygon {
+fill: var(--darkreader-neutral-background) !important;
+}
+svg g rect.task {
+fill: var(--darkreader-selection-background) !important;
+}
+svg line.messageLine0,
+svg line.messageLine1 {
+stroke: var(--darkreader-neutral-text) !important;
+}
+div.mermaid .actor {
+fill: var(--darkreader-neutral-background) !important;
+}
+mitid-authenticators-code-app > .code-app-container {
+background-color: white !important;
+padding-top: 1rem;
+}
+iframe#unpaywall[src$="unpaywall.html"] {
+color-scheme: light !important;
+}
+select {
+--darkreader-bg--form-control-background-color: rgba(22, 22, 22, 0) !important;
+}
+body#tumblr {
+--darkreader-bg--secondary-accent: 31, 32, 34 !important;
+--darkreader-bg--white: 23, 23, 23 !important;
+--darkreader-text--black: 228, 224, 218 !important;
+}
+:host {
+--d2l-border-color: var(--darkreader-bg--d2l-color-gypsum) !important;
+--d2l-button-icon-background-color-hover: var(--darkreader-bg--d2l-color-gypsum) !important;
+--d2l-color-ferrite: var(--darkreader-neutral-text) !important;
+--d2l-color-sylvite: var(--darkreader-bg--d2l-color-sylvite) !important;
+--d2l-dropdown-background-color: var(--darkreader-neutral-background) !important;
+--d2l-dropdown-border-color: var(--darkreader-border--d2l-color-mica) !important;
+--d2l-input-backgroud-color: var(--darkreader-neutral-background) !important;
+--d2l-menu-border-color: var(--darkreader-bg--d2l-color-gypsum) !important;
+--d2l-tooltip-background-color: var(--darkreader-neutral-background) !important;
+--d2l-tooltip-border-color: var(--darkreader-bg--d2l-color-gypsum) !important;
+}
+:host([_floating]) .d2l-floating-buttons-container {
+background-color: var(--darkreader-neutral-background) !important;
+border-top-color: var(--darkreader-border--d2l-color-mica) !important;
+opacity: 0.88 !important;
+}
+d2l-card {
+background: var(--darkreader-neutral-background) !important;
+border-color: var(--darkreader-border--d2l-color-gypsum) !important;
+}
+d2l-dropdown-content > div,
+d2l-menu-item {
+background-color: var(--darkreader-neutral-background) !important;
+border-radius: 10px !important;
+}
+d2l-empty-state-simple {
+border-color: var(--darkreader-bg--d2l-color-gypsum) !important;
+}
+.d2l-button-filter > ul > li > a.vui-button {
+border-color: var(--darkreader-border--d2l-color-mica) !important;
+}
+.d2l-label-text:has(.d2l-button-subtle-content):hover,
+.d2l-label-text:has(.d2l-button-subtle-content):focus,
+.d2l-label-text:has(.d2l-button-subtle-content):active {
+background-color: var(--darkreader-bg--d2l-color-gypsum) !important;
+}
+.d2l-navigation-centerer {
+color: inherit !important;
+}
+.d2l-tabs-layout {
+border-color: var(--darkreader-border--d2l-color-gypsum) !important;
+}
+.d2l-input,
+.d2l-calendar-date,
+.d2l-htmleditor-container {
+background-color: var(--darkreader-neutral-background) !important;
+}
+.d2l-collapsible-panel {
+border: 1px solid var(--darkreader-border--d2l-color-mica) !important;
+border-radius: 0.4rem !important;
+}
+.d2l-collapsible-panel-divider {
+border-bottom: 1px solid var(--darkreader-border--d2l-color-mica) !important;
+}
+.d2l-w2d-flex {
+border-bottom: 2px solid var(--darkreader-border--d2l-color-mica) !important;
+}
+.d2l-collapsible-panel scrolled,
+.d2l-collapsible-panel-header,
+.d2l-w2d-collection-fixed {
+background-color: var(--darkreader-neutral-background) !important;
+}
+.d2l-loading-spinner-bg {
+fill: var(--darkreader-bg--d2l-color-gypsum) !important;
+}
+.d2l-loading-spinner-bg-stroke {
+stroke: var(--darkreader-border--d2l-color-mica) !important;
+}
+.d2l-loading-spinner-wrapper svg path,
+.d2l-loading-spinner-wrapper svg circle {
+fill: var(--darkreader-neutral-background) !important;
+}
+.d2l-twopanelselector-side.d2l-twopanelselector-side-sep {
+background: var(--darkreader-bg--d2l-color-mica) !important;
+}
+.d2l-le-TreeAccordionItem-anchor::before {
+background: var(--darkreader-bg--d2l-color-corundum) !important;
+}
+embed[type="application/pdf"][src="about:blank"] { filter: invert(100%) contrast(90%); }</style><style>undefined</style><style class="darkreader darkreader--sync" media="screen"></style><link rel="preconnect" href="https://fonts.googleapis.com" crossorigin="use-credentials"><link rel="preconnect" href="https://fonts.gstatic.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mulish:wght@200;300;400;500;600;700;800;900&amp;display=swa"><style type="text/css"></style><style class="darkreader darkreader--sync" media="screen"></style><style>/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IiIsInNvdXJjZVJvb3QiOiIifQ== */</style><style class="darkreader darkreader--sync" media="screen"></style><style>.canvas-stage[_ngcontent-ng-c3553685630] {
+height: 100%;
+}
+
+.svg-wrap[_ngcontent-ng-c3553685630] {
+position: relative;
+width: 100%;
+height: 100%;
+}
+
+.dropzone-wrap[_ngcontent-ng-c3553685630] {
+width: 100%;
+height: 100%;
+}
+/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIndlYnBhY2s6Ly8uL3NyYy9hcHAvdGVzdC1yZXZpZXcvdGVzdC90ZXN0LmNvbXBvbmVudC5zY3NzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiJBQUFBO0VBQ0UsWUFBQTtBQUNGOztBQUVBO0VBQ0Usa0JBQUE7RUFDQSxXQUFBO0VBQ0EsWUFBQTtBQUNGOztBQUVBO0VBQ0UsV0FBQTtFQUNBLFlBQUE7QUFDRiIsInNvdXJjZXNDb250ZW50IjpbIi5jYW52YXMtc3RhZ2Uge1xuICBoZWlnaHQ6IDEwMCU7XG59XG5cbi5zdmctd3JhcCB7XG4gIHBvc2l0aW9uOiByZWxhdGl2ZTtcbiAgd2lkdGg6IDEwMCU7XG4gIGhlaWdodDogMTAwJTtcbn1cblxuLmRyb3B6b25lLXdyYXB7XG4gIHdpZHRoOiAxMDAlO1xuICBoZWlnaHQ6IDEwMCU7XG59XG4iXSwic291cmNlUm9vdCI6IiJ9 */</style><style class="darkreader darkreader--sync" media="screen"></style><style>.dpg-icon-moreinfo[_ngcontent-ng-c3596845669]::before, .ahe-icon-moreinfo[_ngcontent-ng-c3596845669]::before {
+content: url("data:image/svg+xml;charset=utf8, %3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23265867' d='M12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14zm0-1a6 6 0 1 0 0-12 6 6 0 0 0 0 12zm-2-3h1v-3h-1v-1h3v4h1v1h-4v-1zm1-7h2v2h-2V8z'/%3E%3C/svg%3E");
+}
+
+.btn-secondary-light[_ngcontent-ng-c3596845669] .dpg-icon-moreinfo[_ngcontent-ng-c3596845669]::before, .btn-secondary-light[_ngcontent-ng-c3596845669] .ahe-icon-moreinfo[_ngcontent-ng-c3596845669]::before {
+content: url("data:image/svg+xml;charset=utf8, %3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14zm0-1a6 6 0 1 0 0-12 6 6 0 0 0 0 12zm-2-3h1v-3h-1v-1h3v4h1v1h-4v-1zm1-7h2v2h-2V8z'/%3E%3C/svg%3E");
+}
+
+.btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared):hover:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .dpg-icon-moreinfo[_ngcontent-ng-c3596845669]::before, .btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared):hover:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .ahe-icon-moreinfo[_ngcontent-ng-c3596845669]::before, .btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared):active:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .dpg-icon-moreinfo[_ngcontent-ng-c3596845669]::before, .btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared):active:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .ahe-icon-moreinfo[_ngcontent-ng-c3596845669]::before, .btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared).active:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .dpg-icon-moreinfo[_ngcontent-ng-c3596845669]::before, .btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared).active:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .ahe-icon-moreinfo[_ngcontent-ng-c3596845669]::before {
+content: url("data:image/svg+xml;charset=utf8, %3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14zm0-1a6 6 0 1 0 0-12 6 6 0 0 0 0 12zm-2-3h1v-3h-1v-1h3v4h1v1h-4v-1zm1-7h2v2h-2V8z'/%3E%3C/svg%3E");
+}
+
+.dpg-icon-notepad[_ngcontent-ng-c3596845669]::before, .ahe-icon-notepad[_ngcontent-ng-c3596845669]::before {
+content: url("data:image/svg+xml;charset=utf8, %3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23265867' d='M4 18H3v-1h1v-2H3v-1h1v-2H3v-1h1V9H3V8h1V6H3V5h1V4a1 1 0 0 1 1-1h14c.55 0 1 .45 1 1v16c0 .55-.45 1-1 1H5a1 1 0 0 1-1-1v-2zm1 0v2h14V4H5v1h1v1H5v2h1v1H5v2h1v1H5v2h1v1H5v2h1v1H5zm3-2h6v1H8v-1zm0-3h9v1H8v-1zm0-3h9v1H8v-1zm0-3h9v1H8V7z'/%3E%3C/svg%3E");
+}
+
+.btn-secondary-light[_ngcontent-ng-c3596845669] .dpg-icon-notepad[_ngcontent-ng-c3596845669]::before, .btn-secondary-light[_ngcontent-ng-c3596845669] .ahe-icon-notepad[_ngcontent-ng-c3596845669]::before {
+content: url("data:image/svg+xml;charset=utf8, %3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M4 18H3v-1h1v-2H3v-1h1v-2H3v-1h1V9H3V8h1V6H3V5h1V4a1 1 0 0 1 1-1h14c.55 0 1 .45 1 1v16c0 .55-.45 1-1 1H5a1 1 0 0 1-1-1v-2zm1 0v2h14V4H5v1h1v1H5v2h1v1H5v2h1v1H5v2h1v1H5v2h1v1H5zm3-2h6v1H8v-1zm0-3h9v1H8v-1zm0-3h9v1H8v-1zm0-3h9v1H8V7z'/%3E%3C/svg%3E");
+}
+
+.btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared):hover:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .dpg-icon-notepad[_ngcontent-ng-c3596845669]::before, .btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared):hover:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .ahe-icon-notepad[_ngcontent-ng-c3596845669]::before, .btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared):active:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .dpg-icon-notepad[_ngcontent-ng-c3596845669]::before, .btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared):active:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .ahe-icon-notepad[_ngcontent-ng-c3596845669]::before, .btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared).active:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .dpg-icon-notepad[_ngcontent-ng-c3596845669]::before, .btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared).active:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .ahe-icon-notepad[_ngcontent-ng-c3596845669]::before {
+content: url("data:image/svg+xml;charset=utf8, %3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M4 18H3v-1h1v-2H3v-1h1v-2H3v-1h1V9H3V8h1V6H3V5h1V4a1 1 0 0 1 1-1h14c.55 0 1 .45 1 1v16c0 .55-.45 1-1 1H5a1 1 0 0 1-1-1v-2zm1 0v2h14V4H5v1h1v1H5v2h1v1H5v2h1v1H5v2h1v1H5v2h1v1H5zm3-2h6v1H8v-1zm0-3h9v1H8v-1zm0-3h9v1H8v-1zm0-3h9v1H8V7z'/%3E%3C/svg%3E");
+}
+
+.dpg-icon-comment[_ngcontent-ng-c3596845669]::before, .ahe-icon-comment[_ngcontent-ng-c3596845669]::before {
+content: url("data:image/svg+xml;charset=utf8, %3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23009bb5' d='M18 9v1H6V9h12zm-6 3v1H6v-1h6zm6-6v1H6V6h12z'/%3E%3Cpath fill='%23265867' d='M18 17h3a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h8.532l4.7 5.64c.598.72 1.768.295 1.768-.64v-5zm-1 5l-5-6H3V3h18v13h-4v6z'/%3E%3C/svg%3E");
+}
+
+.btn-secondary-light[_ngcontent-ng-c3596845669] .dpg-icon-comment[_ngcontent-ng-c3596845669]::before, .btn-secondary-light[_ngcontent-ng-c3596845669] .ahe-icon-comment[_ngcontent-ng-c3596845669]::before {
+content: url("data:image/svg+xml;charset=utf8, %3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M21 2a1 1 0 0 1 .993.883L22 3v13a1 1 0 0 1-.883.993L21 17h-3v5c0 .896-1.074 1.323-1.69.724l-.078-.084-4.7-5.64H3a1 1 0 0 1-.993-.883L2 16V3a1 1 0 0 1 .883-.993L3 2h18zm0 1H3v13h9l5 6v-6h4V3zm-9 9v1H6v-1h6zm6-3v1H6V9h12zm0-3v1H6V6h12z'/%3E%3C/svg%3E");
+}
+
+.btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared):hover:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .dpg-icon-comment[_ngcontent-ng-c3596845669]::before, .btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared):hover:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .ahe-icon-comment[_ngcontent-ng-c3596845669]::before, .btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared):active:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .dpg-icon-comment[_ngcontent-ng-c3596845669]::before, .btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared):active:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .ahe-icon-comment[_ngcontent-ng-c3596845669]::before, .btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared).active:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .dpg-icon-comment[_ngcontent-ng-c3596845669]::before, .btn-icon[_ngcontent-ng-c3596845669]:not(.ngx-shared).active:not(:disabled, .disabled)[_ngcontent-ng-c3596845669] .ahe-icon-comment[_ngcontent-ng-c3596845669]::before {
+content: url("data:image/svg+xml;charset=utf8, %3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M21 2a1 1 0 0 1 .993.883L22 3v13a1 1 0 0 1-.883.993L21 17h-3v5c0 .896-1.074 1.323-1.69.724l-.078-.084-4.7-5.64H3a1 1 0 0 1-.993-.883L2 16V3a1 1 0 0 1 .883-.993L3 2h18zm0 1H3v13h9l5 6v-6h4V3zm-9 9v1H6v-1h6zm6-3v1H6V9h12zm0-3v1H6V6h12z'/%3E%3C/svg%3E");
+}
+
+.label-wrap[_ngcontent-ng-c3596845669] {
+min-width: 171px;
+height: 100%;
+border-right: 1px solid #d1dbde;
+}
+
+.label-header[_ngcontent-ng-c3596845669] {
+border-bottom: 1px solid #d1dbde;
+padding: 6px 10px;
+height: 49px;
+}
+
+.label-list[_ngcontent-ng-c3596845669] {
+overflow-y: auto;
+height: calc(100% - 49px);
+overflow-x: hidden;
+}
+.label-list[_ngcontent-ng-c3596845669] ul[_ngcontent-ng-c3596845669] {
+margin: 0;
+padding: 0;
+list-style: none;
+}
+
+.label-item[_ngcontent-ng-c3596845669] {
+padding: 10px;
+}
+
+.label-item-firefox[_ngcontent-ng-c3596845669] {
+margin-right: 10px;
+}
+
+.note-button[_ngcontent-ng-c3596845669] {
+width: 36px;
+height: 36px;
+margin-top: 5px;
+margin-left: 5px;
+padding: 8px;
+}
+
+.feedback-button[_ngcontent-ng-c3596845669] {
+width: 36px;
+height: 36px;
+margin-top: 5px;
+margin-left: 5px;
+padding: 8px;
+}
+
+.single-label-multiDock[_ngcontent-ng-c3596845669] {
+margin-bottom: 16px;
+}
+/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIndlYnBhY2s6Ly8uL25vZGVfbW9kdWxlcy9AbWhlL29wZW5sZWFybmluZy10aGVtZWtpdC1pY29ucy9pY29ucy9fbW9yZWluZm8uc2NzcyIsIndlYnBhY2s6Ly8uL3NyYy9hcHAvc2hhcmVkL2NvbXBvbmVudHMvbGFiZWxzL2xhYmVscy5jb21wb25lbnQuc2NzcyIsIndlYnBhY2s6Ly8uL25vZGVfbW9kdWxlcy9AbWhlL29wZW5sZWFybmluZy10aGVtZWtpdC1pY29ucy9pY29ucy9fbm90ZXBhZC5zY3NzIiwid2VicGFjazovLy4vbm9kZV9tb2R1bGVzL0BtaGUvb3BlbmxlYXJuaW5nLXRoZW1la2l0LWljb25zL2ljb25zL19jb21tZW50LnNjc3MiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFBQUE7RUFDSSxpUkFBQTtBQ0NKOztBREVNO0VBQ0YsOFFBQUE7QUNDSjs7QURRUTtFQUNKLDhRQUFBO0FDTEo7O0FDVkE7RUFDSSxtWUFBQTtBRGFKOztBQ1ZNO0VBQ0YsZ1lBQUE7QURhSjs7QUNKUTtFQUNKLGdZQUFBO0FET0o7O0FFdEJBO0VBQ0kseVhBQUE7QUZ5Qko7O0FFdEJNO0VBQ0Ysa1lBQUE7QUZ5Qko7O0FFaEJRO0VBQ0osa1lBQUE7QUZtQko7O0FBN0JBO0VBQ0UsZ0JBQUE7RUFDQSxZQUFBO0VBQ0EsK0JBQUE7QUFnQ0Y7O0FBN0JBO0VBQ0UsZ0NBQUE7RUFDQSxpQkFBQTtFQUNBLFlBQUE7QUFnQ0Y7O0FBN0JBO0VBQ0UsZ0JBQUE7RUFDQSx5QkFBQTtFQUNBLGtCQUFBO0FBZ0NGO0FBL0JFO0VBQ0UsU0FBQTtFQUNBLFVBQUE7RUFDQSxnQkFBQTtBQWlDSjs7QUE3QkE7RUFDRSxhQUFBO0FBZ0NGOztBQTVCQTtFQUNFLGtCQUFBO0FBK0JGOztBQTVCQTtFQUNFLFdBQUE7RUFDQSxZQUFBO0VBQ0EsZUFBQTtFQUNBLGdCQUFBO0VBQ0EsWUFBQTtBQStCRjs7QUE3QkE7RUFDRSxXQUFBO0VBQ0EsWUFBQTtFQUNBLGVBQUE7RUFDQSxnQkFBQTtFQUNBLFlBQUE7QUFnQ0Y7O0FBOUJBO0VBQ0UsbUJBQUE7QUFpQ0YiLCJzb3VyY2VzQ29udGVudCI6WyIuZHBnLWljb24tbW9yZWluZm86OmJlZm9yZSwgLmFoZS1pY29uLW1vcmVpbmZvOjpiZWZvcmUge1xuICAgIGNvbnRlbnQ6IHVybChcImRhdGE6aW1hZ2Uvc3ZnK3htbDtjaGFyc2V0PXV0ZjgsICUzQ3N2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCclM0UlM0NwYXRoIGZpbGw9JyUyMzI2NTg2NycgZD0nTTEyIDE5YTcgNyAwIDEgMSAwLTE0IDcgNyAwIDAgMSAwIDE0em0wLTFhNiA2IDAgMSAwIDAtMTIgNiA2IDAgMCAwIDAgMTJ6bS0yLTNoMXYtM2gtMXYtMWgzdjRoMXYxaC00di0xem0xLTdoMnYyaC0yVjh6Jy8lM0UlM0Mvc3ZnJTNFXCIpO1xufVxuLmJ0bi1zZWNvbmRhcnktbGlnaHQge1xuICAgICAgLmRwZy1pY29uLW1vcmVpbmZvOjpiZWZvcmUsIC5haGUtaWNvbi1tb3JlaW5mbzo6YmVmb3JlIHtcbiAgICBjb250ZW50OiB1cmwoXCJkYXRhOmltYWdlL3N2Zyt4bWw7Y2hhcnNldD11dGY4LCAlM0NzdmcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJyB2aWV3Qm94PScwIDAgMjQgMjQnJTNFJTNDcGF0aCBmaWxsPSclMjNmZmYnIGQ9J00xMiAxOWE3IDcgMCAxIDEgMC0xNCA3IDcgMCAwIDEgMCAxNHptMC0xYTYgNiAwIDEgMCAwLTEyIDYgNiAwIDAgMCAwIDEyem0tMi0zaDF2LTNoLTF2LTFoM3Y0aDF2MWgtNHYtMXptMS03aDJ2MmgtMlY4eicvJTNFJTNDL3N2ZyUzRVwiKTtcbn1cbn1cbi5idG4taWNvbiB7XG4gICY6bm90KC5uZ3gtc2hhcmVkKSB7XG4gICAgJjpob3ZlcixcbiAgICAmOmFjdGl2ZSxcbiAgICAmLmFjdGl2ZSB7XG4gICAgICAmOm5vdCg6ZGlzYWJsZWQsIC5kaXNhYmxlZCkge1xuICAgICAgICAuZHBnLWljb24tbW9yZWluZm86OmJlZm9yZSwgLmFoZS1pY29uLW1vcmVpbmZvOjpiZWZvcmUge1xuICAgIGNvbnRlbnQ6IHVybChcImRhdGE6aW1hZ2Uvc3ZnK3htbDtjaGFyc2V0PXV0ZjgsICUzQ3N2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCclM0UlM0NwYXRoIGZpbGw9JyUyM2ZmZicgZD0nTTEyIDE5YTcgNyAwIDEgMSAwLTE0IDcgNyAwIDAgMSAwIDE0em0wLTFhNiA2IDAgMSAwIDAtMTIgNiA2IDAgMCAwIDAgMTJ6bS0yLTNoMXYtM2gtMXYtMWgzdjRoMXYxaC00di0xem0xLTdoMnYyaC0yVjh6Jy8lM0UlM0Mvc3ZnJTNFXCIpO1xufVxuICAgICAgfVxuICAgIH1cbiAgfVxufVxuIiwiQGltcG9ydCAnbm9kZV9tb2R1bGVzL0BtaGUvb3BlbmxlYXJuaW5nLXRoZW1la2l0LWljb25zL2ljb25zL21vcmVpbmZvJztcbkBpbXBvcnQgJ25vZGVfbW9kdWxlcy9AbWhlL29wZW5sZWFybmluZy10aGVtZWtpdC1pY29ucy9pY29ucy9ub3RlcGFkJztcbkBpbXBvcnQgJ25vZGVfbW9kdWxlcy9AbWhlL29wZW5sZWFybmluZy10aGVtZWtpdC1pY29ucy9pY29ucy9jb21tZW50JztcbkBpbXBvcnQgJy4uLy4uLy4uL3N0eWxlcy92YXJpYWJsZXMnO1xuXG4ubGFiZWwtd3JhcCB7XG4gIG1pbi13aWR0aDogMTcxcHg7XG4gIGhlaWdodDogMTAwJTtcbiAgYm9yZGVyLXJpZ2h0OiAxcHggc29saWQgJGdyYXktMDM7XG59XG5cbi5sYWJlbC1oZWFkZXIge1xuICBib3JkZXItYm90dG9tOiAxcHggc29saWQgJGdyYXktMDM7XG4gIHBhZGRpbmc6IDZweCAxMHB4O1xuICBoZWlnaHQ6IDQ5cHg7XG59XG5cbi5sYWJlbC1saXN0IHtcbiAgb3ZlcmZsb3cteTogYXV0bztcbiAgaGVpZ2h0OiBjYWxjKDEwMCUgLSA0OXB4KTtcbiAgb3ZlcmZsb3cteDogaGlkZGVuO1xuICB1bCB7XG4gICAgbWFyZ2luOiAwO1xuICAgIHBhZGRpbmc6IDA7XG4gICAgbGlzdC1zdHlsZTogbm9uZTtcbiAgfVxufVxuXG4ubGFiZWwtaXRlbSB7XG4gIHBhZGRpbmc6IDEwcHg7XG5cbn1cblxuLmxhYmVsLWl0ZW0tZmlyZWZveHtcbiAgbWFyZ2luLXJpZ2h0OiAxMHB4O1xufVxuXG4ubm90ZS1idXR0b24ge1xuICB3aWR0aDogMzZweDtcbiAgaGVpZ2h0OiAzNnB4O1xuICBtYXJnaW4tdG9wOiA1cHg7XG4gIG1hcmdpbi1sZWZ0OiA1cHg7XG4gIHBhZGRpbmc6IDhweDtcbn1cbi5mZWVkYmFjay1idXR0b24ge1xuICB3aWR0aDogMzZweDtcbiAgaGVpZ2h0OiAzNnB4O1xuICBtYXJnaW4tdG9wOiA1cHg7XG4gIG1hcmdpbi1sZWZ0OiA1cHg7XG4gIHBhZGRpbmc6IDhweDtcbn1cbi5zaW5nbGUtbGFiZWwtbXVsdGlEb2NrIHtcbiAgbWFyZ2luLWJvdHRvbTogMTZweDtcbn1cbiIsIi5kcGctaWNvbi1ub3RlcGFkOjpiZWZvcmUsIC5haGUtaWNvbi1ub3RlcGFkOjpiZWZvcmUge1xuICAgIGNvbnRlbnQ6IHVybChcImRhdGE6aW1hZ2Uvc3ZnK3htbDtjaGFyc2V0PXV0ZjgsICUzQ3N2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCclM0UlM0NwYXRoIGZpbGw9JyUyMzI2NTg2NycgZD0nTTQgMThIM3YtMWgxdi0ySDN2LTFoMXYtMkgzdi0xaDFWOUgzVjhoMVY2SDNWNWgxVjRhMSAxIDAgMCAxIDEtMWgxNGMuNTUgMCAxIC40NSAxIDF2MTZjMCAuNTUtLjQ1IDEtMSAxSDVhMSAxIDAgMCAxLTEtMXYtMnptMSAwdjJoMTRWNEg1djFoMXYxSDV2MmgxdjFINXYyaDF2MUg1djJoMXYxSDV2MmgxdjFINXptMy0yaDZ2MUg4di0xem0wLTNoOXYxSDh2LTF6bTAtM2g5djFIOHYtMXptMC0zaDl2MUg4Vjd6Jy8lM0UlM0Mvc3ZnJTNFXCIpO1xufVxuLmJ0bi1zZWNvbmRhcnktbGlnaHQge1xuICAgICAgLmRwZy1pY29uLW5vdGVwYWQ6OmJlZm9yZSwgLmFoZS1pY29uLW5vdGVwYWQ6OmJlZm9yZSB7XG4gICAgY29udGVudDogdXJsKFwiZGF0YTppbWFnZS9zdmcreG1sO2NoYXJzZXQ9dXRmOCwgJTNDc3ZnIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zycgdmlld0JveD0nMCAwIDI0IDI0JyUzRSUzQ3BhdGggZmlsbD0nJTIzZmZmJyBkPSdNNCAxOEgzdi0xaDF2LTJIM3YtMWgxdi0ySDN2LTFoMVY5SDNWOGgxVjZIM1Y1aDFWNGExIDEgMCAwIDEgMS0xaDE0Yy41NSAwIDEgLjQ1IDEgMXYxNmMwIC41NS0uNDUgMS0xIDFINWExIDEgMCAwIDEtMS0xdi0yem0xIDB2MmgxNFY0SDV2MWgxdjFINXYyaDF2MUg1djJoMXYxSDV2MmgxdjFINXYyaDF2MUg1em0zLTJoNnYxSDh2LTF6bTAtM2g5djFIOHYtMXptMC0zaDl2MUg4di0xem0wLTNoOXYxSDhWN3onLyUzRSUzQy9zdmclM0VcIik7XG59XG59XG4uYnRuLWljb24ge1xuICAmOm5vdCgubmd4LXNoYXJlZCkge1xuICAgICY6aG92ZXIsXG4gICAgJjphY3RpdmUsXG4gICAgJi5hY3RpdmUge1xuICAgICAgJjpub3QoOmRpc2FibGVkLCAuZGlzYWJsZWQpIHtcbiAgICAgICAgLmRwZy1pY29uLW5vdGVwYWQ6OmJlZm9yZSwgLmFoZS1pY29uLW5vdGVwYWQ6OmJlZm9yZSB7XG4gICAgY29udGVudDogdXJsKFwiZGF0YTppbWFnZS9zdmcreG1sO2NoYXJzZXQ9dXRmOCwgJTNDc3ZnIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zycgdmlld0JveD0nMCAwIDI0IDI0JyUzRSUzQ3BhdGggZmlsbD0nJTIzZmZmJyBkPSdNNCAxOEgzdi0xaDF2LTJIM3YtMWgxdi0ySDN2LTFoMVY5SDNWOGgxVjZIM1Y1aDFWNGExIDEgMCAwIDEgMS0xaDE0Yy41NSAwIDEgLjQ1IDEgMXYxNmMwIC41NS0uNDUgMS0xIDFINWExIDEgMCAwIDEtMS0xdi0yem0xIDB2MmgxNFY0SDV2MWgxdjFINXYyaDF2MUg1djJoMXYxSDV2MmgxdjFINXYyaDF2MUg1em0zLTJoNnYxSDh2LTF6bTAtM2g5djFIOHYtMXptMC0zaDl2MUg4di0xem0wLTNoOXYxSDhWN3onLyUzRSUzQy9zdmclM0VcIik7XG59XG4gICAgICB9XG4gICAgfVxuICB9XG59XG4iLCIuZHBnLWljb24tY29tbWVudDo6YmVmb3JlLCAuYWhlLWljb24tY29tbWVudDo6YmVmb3JlIHtcbiAgICBjb250ZW50OiB1cmwoXCJkYXRhOmltYWdlL3N2Zyt4bWw7Y2hhcnNldD11dGY4LCAlM0NzdmcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJyB2aWV3Qm94PScwIDAgMjQgMjQnJTNFJTNDcGF0aCBmaWxsPSclMjMwMDliYjUnIGQ9J00xOCA5djFINlY5aDEyem0tNiAzdjFINnYtMWg2em02LTZ2MUg2VjZoMTJ6Jy8lM0UlM0NwYXRoIGZpbGw9JyUyMzI2NTg2NycgZD0nTTE4IDE3aDNhMSAxIDAgMCAwIDEtMVYzYTEgMSAwIDAgMC0xLTFIM2ExIDEgMCAwIDAtMSAxdjEzYTEgMSAwIDAgMCAxIDFoOC41MzJsNC43IDUuNjRjLjU5OC43MiAxLjc2OC4yOTUgMS43NjgtLjY0di01em0tMSA1bC01LTZIM1YzaDE4djEzaC00djZ6Jy8lM0UlM0Mvc3ZnJTNFXCIpO1xufVxuLmJ0bi1zZWNvbmRhcnktbGlnaHQge1xuICAgICAgLmRwZy1pY29uLWNvbW1lbnQ6OmJlZm9yZSwgLmFoZS1pY29uLWNvbW1lbnQ6OmJlZm9yZSB7XG4gICAgY29udGVudDogdXJsKFwiZGF0YTppbWFnZS9zdmcreG1sO2NoYXJzZXQ9dXRmOCwgJTNDc3ZnIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zycgdmlld0JveD0nMCAwIDI0IDI0JyUzRSUzQ3BhdGggZmlsbD0nJTIzZmZmJyBkPSdNMjEgMmExIDEgMCAwIDEgLjk5My44ODNMMjIgM3YxM2ExIDEgMCAwIDEtLjg4My45OTNMMjEgMTdoLTN2NWMwIC44OTYtMS4wNzQgMS4zMjMtMS42OS43MjRsLS4wNzgtLjA4NC00LjctNS42NEgzYTEgMSAwIDAgMS0uOTkzLS44ODNMMiAxNlYzYTEgMSAwIDAgMSAuODgzLS45OTNMMyAyaDE4em0wIDFIM3YxM2g5bDUgNnYtNmg0VjN6bS05IDl2MUg2di0xaDZ6bTYtM3YxSDZWOWgxMnptMC0zdjFINlY2aDEyeicvJTNFJTNDL3N2ZyUzRVwiKTtcbn1cbn1cbi5idG4taWNvbiB7XG4gICY6bm90KC5uZ3gtc2hhcmVkKSB7XG4gICAgJjpob3ZlcixcbiAgICAmOmFjdGl2ZSxcbiAgICAmLmFjdGl2ZSB7XG4gICAgICAmOm5vdCg6ZGlzYWJsZWQsIC5kaXNhYmxlZCkge1xuICAgICAgICAuZHBnLWljb24tY29tbWVudDo6YmVmb3JlLCAuYWhlLWljb24tY29tbWVudDo6YmVmb3JlIHtcbiAgICBjb250ZW50OiB1cmwoXCJkYXRhOmltYWdlL3N2Zyt4bWw7Y2hhcnNldD11dGY4LCAlM0NzdmcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJyB2aWV3Qm94PScwIDAgMjQgMjQnJTNFJTNDcGF0aCBmaWxsPSclMjNmZmYnIGQ9J00yMSAyYTEgMSAwIDAgMSAuOTkzLjg4M0wyMiAzdjEzYTEgMSAwIDAgMS0uODgzLjk5M0wyMSAxN2gtM3Y1YzAgLjg5Ni0xLjA3NCAxLjMyMy0xLjY5LjcyNGwtLjA3OC0uMDg0LTQuNy01LjY0SDNhMSAxIDAgMCAxLS45OTMtLjg4M0wyIDE2VjNhMSAxIDAgMCAxIC44ODMtLjk5M0wzIDJoMTh6bTAgMUgzdjEzaDlsNSA2di02aDRWM3ptLTkgOXYxSDZ2LTFoNnptNi0zdjFINlY5aDEyem0wLTN2MUg2VjZoMTJ6Jy8lM0UlM0Mvc3ZnJTNFXCIpO1xufVxuICAgICAgfVxuICAgIH1cbiAgfVxufVxuIl0sInNvdXJjZVJvb3QiOiIifQ== */</style><style class="darkreader darkreader--sync" media="screen"></style><style>i.dpg-icon[_ngcontent-ng-c1823468225], i.ahe-icon[_ngcontent-ng-c1823468225], icon.dpg-icon[_ngcontent-ng-c1823468225], icon.ahe-icon[_ngcontent-ng-c1823468225] {
+width: 20px;
+height: 20px;
+}
+i.dpg-icon[_ngcontent-ng-c1823468225]:not(.fa), i.ahe-icon[_ngcontent-ng-c1823468225]:not(.fa), icon.dpg-icon[_ngcontent-ng-c1823468225]:not(.fa), icon.ahe-icon[_ngcontent-ng-c1823468225]:not(.fa) {
+background-origin: content-box;
+background-position: center center;
+background-repeat: no-repeat;
+display: inline-block;
+}
+
+.group-container[_ngcontent-ng-c1823468225] {
+display: flex;
+flex-wrap: wrap;
+padding: 0 12px;
+}
+
+.groups[_ngcontent-ng-c1823468225] {
+margin: 12px;
+height: inherit;
+display: flex;
+flex-direction: column;
+}
+
+.single-group[_ngcontent-ng-c1823468225] {
+width: 180px;
+}
+/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIndlYnBhY2s6Ly8uL25vZGVfbW9kdWxlcy9AbWhlL29wZW5sZWFybmluZy10aGVtZWtpdC1pY29ucy9pY29uLWJhc2Uuc2NzcyIsIndlYnBhY2s6Ly8uL3NyYy9hcHAvdGVzdC1yZXZpZXcvdGVzdC90ZXN0LWdyb3VwL3Rlc3QtZ3JvdXAuY29tcG9uZW50LnNjc3MiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFBRUU7OztFQUVFLFdBQUE7RUFDQSxZQUFBO0FDQUo7QURDSTs7O0VBQ0UsOEJBQUE7RUFDQSxrQ0FBQTtFQUNBLDRCQUFBO0VBQ0EscUJBQUE7QUNHTjs7QUFYQTtFQUNFLGFBQUE7RUFDQSxlQUFBO0VBQ0EsZUFBQTtBQWNGOztBQVhBO0VBQ0UsWUFBQTtFQUNBLGVBQUE7RUFDQSxhQUFBO0VBQ0Esc0JBQUE7QUFjRjs7QUFYQTtFQUNFLFlBQUE7QUFjRiIsInNvdXJjZXNDb250ZW50IjpbImksIFxuaWNvbiB7XG4gICYuZHBnLWljb24sXG4gICYuYWhlLWljb24ge1xuICAgIHdpZHRoOiAyMHB4O1xuICAgIGhlaWdodDogMjBweDtcbiAgICAmOm5vdCguZmEpIHtcbiAgICAgIGJhY2tncm91bmQtb3JpZ2luOiBjb250ZW50LWJveDtcbiAgICAgIGJhY2tncm91bmQtcG9zaXRpb246IGNlbnRlciBjZW50ZXI7XG4gICAgICBiYWNrZ3JvdW5kLXJlcGVhdDogbm8tcmVwZWF0O1xuICAgICAgZGlzcGxheTogaW5saW5lLWJsb2NrO1xuICAgIH1cbiAgfVxufVxuIiwiQGltcG9ydCAnbm9kZV9tb2R1bGVzL0BtaGUvb3BlbmxlYXJuaW5nLXRoZW1la2l0LWljb25zL2ljb24tYmFzZSc7XG5cbi5ncm91cC1jb250YWluZXIge1xuICBkaXNwbGF5OiBmbGV4O1xuICBmbGV4LXdyYXA6IHdyYXA7XG4gIHBhZGRpbmc6IDAgMTJweDtcbn1cblxuLmdyb3VwcyB7XG4gIG1hcmdpbjogMTJweDtcbiAgaGVpZ2h0OiBpbmhlcml0O1xuICBkaXNwbGF5OiBmbGV4O1xuICBmbGV4LWRpcmVjdGlvbjogY29sdW1uO1xufVxuXG4uc2luZ2xlLWdyb3VwIHtcbiAgd2lkdGg6IDE4MHB4O1xufSJdLCJzb3VyY2VSb290IjoiIn0= */</style><style class="darkreader darkreader--sync" media="screen"></style><style>i.dpg-icon[_ngcontent-ng-c4174148129], i.ahe-icon[_ngcontent-ng-c4174148129], icon.dpg-icon[_ngcontent-ng-c4174148129], icon.ahe-icon[_ngcontent-ng-c4174148129] {
+width: 20px;
+height: 20px;
+}
+i.dpg-icon[_ngcontent-ng-c4174148129]:not(.fa), i.ahe-icon[_ngcontent-ng-c4174148129]:not(.fa), icon.dpg-icon[_ngcontent-ng-c4174148129]:not(.fa), icon.ahe-icon[_ngcontent-ng-c4174148129]:not(.fa) {
+background-origin: content-box;
+background-position: center center;
+background-repeat: no-repeat;
+display: inline-block;
+}
+
+.dpg-icon-undo[_ngcontent-ng-c4174148129]::before, .ahe-icon-undo[_ngcontent-ng-c4174148129]::before {
+content: url("data:image/svg+xml;charset=utf8, %3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23265867' d='M5.914 11.997l4.45 4.45-.707.707L4 11.497 9.657 5.84l.707.707-4.45 4.45H16a4 4 0 0 1 4 4v1h-1v-1a3 3 0 0 0-3-3H5.914z'/%3E%3C/svg%3E");
+}
+
+.btn-secondary-light[_ngcontent-ng-c4174148129] .dpg-icon-undo[_ngcontent-ng-c4174148129]::before, .btn-secondary-light[_ngcontent-ng-c4174148129] .ahe-icon-undo[_ngcontent-ng-c4174148129]::before {
+content: url("data:image/svg+xml;charset=utf8, %3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M5.914 11.997l4.45 4.45-.707.707L4 11.497 9.657 5.84l.707.707-4.45 4.45H16a4 4 0 0 1 4 4v1h-1v-1a3 3 0 0 0-3-3H5.914z'/%3E%3C/svg%3E");
+}
+
+.btn-icon[_ngcontent-ng-c4174148129]:not(.ngx-shared):hover:not(:disabled, .disabled)[_ngcontent-ng-c4174148129] .dpg-icon-undo[_ngcontent-ng-c4174148129]::before, .btn-icon[_ngcontent-ng-c4174148129]:not(.ngx-shared):hover:not(:disabled, .disabled)[_ngcontent-ng-c4174148129] .ahe-icon-undo[_ngcontent-ng-c4174148129]::before, .btn-icon[_ngcontent-ng-c4174148129]:not(.ngx-shared):active:not(:disabled, .disabled)[_ngcontent-ng-c4174148129] .dpg-icon-undo[_ngcontent-ng-c4174148129]::before, .btn-icon[_ngcontent-ng-c4174148129]:not(.ngx-shared):active:not(:disabled, .disabled)[_ngcontent-ng-c4174148129] .ahe-icon-undo[_ngcontent-ng-c4174148129]::before, .btn-icon[_ngcontent-ng-c4174148129]:not(.ngx-shared).active:not(:disabled, .disabled)[_ngcontent-ng-c4174148129] .dpg-icon-undo[_ngcontent-ng-c4174148129]::before, .btn-icon[_ngcontent-ng-c4174148129]:not(.ngx-shared).active:not(:disabled, .disabled)[_ngcontent-ng-c4174148129] .ahe-icon-undo[_ngcontent-ng-c4174148129]::before {
+content: url("data:image/svg+xml;charset=utf8, %3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M5.914 11.997l4.45 4.45-.707.707L4 11.497 9.657 5.84l.707.707-4.45 4.45H16a4 4 0 0 1 4 4v1h-1v-1a3 3 0 0 0-3-3H5.914z'/%3E%3C/svg%3E");
+}
+
+.header[_ngcontent-ng-c4174148129] {
+display: flex;
+height: 49px;
+width: 100%;
+border-bottom: 1px solid #d1dbde;
+align-items: center;
+padding: 6px 10px;
+}
+
+.undo-button[_ngcontent-ng-c4174148129] {
+margin: 8px;
+padding: 8px 8px;
+}
+/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIndlYnBhY2s6Ly8uL25vZGVfbW9kdWxlcy9AbWhlL29wZW5sZWFybmluZy10aGVtZWtpdC1pY29ucy9pY29uLWJhc2Uuc2NzcyIsIndlYnBhY2s6Ly8uL3NyYy9hcHAvc2hhcmVkL2NvbXBvbmVudHMvdW5kby1yZXNldC91bmRvLXJlc2V0LmNvbXBvbmVudC5zY3NzIiwid2VicGFjazovLy4vbm9kZV9tb2R1bGVzL0BtaGUvb3BlbmxlYXJuaW5nLXRoZW1la2l0LWljb25zL2ljb25zL191bmRvLnNjc3MiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFBRUU7OztFQUVFLFdBQUE7RUFDQSxZQUFBO0FDQUo7QURDSTs7O0VBQ0UsOEJBQUE7RUFDQSxrQ0FBQTtFQUNBLDRCQUFBO0VBQ0EscUJBQUE7QUNHTjs7QUNiQTtFQUNJLGlSQUFBO0FEZ0JKOztBQ2JNO0VBQ0YsOFFBQUE7QURnQko7O0FDUFE7RUFDSiw4UUFBQTtBRFVKOztBQXBCQTtFQUNFLGFBQUE7RUFDQSxZQUFBO0VBQ0EsV0FBQTtFQUNBLGdDQUFBO0VBQ0EsbUJBQUE7RUFDQSxpQkFBQTtBQXVCRjs7QUFuQkE7RUFDSSxXQUFBO0VBQ0EsZ0JBQUE7QUFzQkoiLCJzb3VyY2VzQ29udGVudCI6WyJpLCBcbmljb24ge1xuICAmLmRwZy1pY29uLFxuICAmLmFoZS1pY29uIHtcbiAgICB3aWR0aDogMjBweDtcbiAgICBoZWlnaHQ6IDIwcHg7XG4gICAgJjpub3QoLmZhKSB7XG4gICAgICBiYWNrZ3JvdW5kLW9yaWdpbjogY29udGVudC1ib3g7XG4gICAgICBiYWNrZ3JvdW5kLXBvc2l0aW9uOiBjZW50ZXIgY2VudGVyO1xuICAgICAgYmFja2dyb3VuZC1yZXBlYXQ6IG5vLXJlcGVhdDtcbiAgICAgIGRpc3BsYXk6IGlubGluZS1ibG9jaztcbiAgICB9XG4gIH1cbn1cbiIsIkBpbXBvcnQgJ25vZGVfbW9kdWxlcy9AbWhlL29wZW5sZWFybmluZy10aGVtZWtpdC1pY29ucy9pY29uLWJhc2UnO1xuQGltcG9ydCAnbm9kZV9tb2R1bGVzL0BtaGUvb3BlbmxlYXJuaW5nLXRoZW1la2l0LWljb25zL2ljb25zL3VuZG8nO1xuQGltcG9ydCAnLi4vLi4vLi4vc3R5bGVzL3ZhcmlhYmxlcyc7XG5cblxuLmhlYWRlciB7XG4gIGRpc3BsYXk6IGZsZXg7XG4gIGhlaWdodDogNDlweDtcbiAgd2lkdGg6IDEwMCU7XG4gIGJvcmRlci1ib3R0b206IDFweCBzb2xpZCAkZ3JheS0wMztcbiAgYWxpZ24taXRlbXM6IGNlbnRlcjtcbiAgcGFkZGluZzogNnB4IDEwcHg7XG5cbn1cblxuLnVuZG8tYnV0dG9uIHtcbiAgICBtYXJnaW46IDhweDtcbiAgICBwYWRkaW5nOiA4cHggOHB4O1xufVxuIiwiLmRwZy1pY29uLXVuZG86OmJlZm9yZSwgLmFoZS1pY29uLXVuZG86OmJlZm9yZSB7XG4gICAgY29udGVudDogdXJsKFwiZGF0YTppbWFnZS9zdmcreG1sO2NoYXJzZXQ9dXRmOCwgJTNDc3ZnIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zycgdmlld0JveD0nMCAwIDI0IDI0JyUzRSUzQ3BhdGggZmlsbD0nJTIzMjY1ODY3JyBkPSdNNS45MTQgMTEuOTk3bDQuNDUgNC40NS0uNzA3LjcwN0w0IDExLjQ5NyA5LjY1NyA1Ljg0bC43MDcuNzA3LTQuNDUgNC40NUgxNmE0IDQgMCAwIDEgNCA0djFoLTF2LTFhMyAzIDAgMCAwLTMtM0g1LjkxNHonLyUzRSUzQy9zdmclM0VcIik7XG59XG4uYnRuLXNlY29uZGFyeS1saWdodCB7XG4gICAgICAuZHBnLWljb24tdW5kbzo6YmVmb3JlLCAuYWhlLWljb24tdW5kbzo6YmVmb3JlIHtcbiAgICBjb250ZW50OiB1cmwoXCJkYXRhOmltYWdlL3N2Zyt4bWw7Y2hhcnNldD11dGY4LCAlM0NzdmcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJyB2aWV3Qm94PScwIDAgMjQgMjQnJTNFJTNDcGF0aCBmaWxsPSclMjNmZmYnIGQ9J001LjkxNCAxMS45OTdsNC40NSA0LjQ1LS43MDcuNzA3TDQgMTEuNDk3IDkuNjU3IDUuODRsLjcwNy43MDctNC40NSA0LjQ1SDE2YTQgNCAwIDAgMSA0IDR2MWgtMXYtMWEzIDMgMCAwIDAtMy0zSDUuOTE0eicvJTNFJTNDL3N2ZyUzRVwiKTtcbn1cbn1cbi5idG4taWNvbiB7XG4gICY6bm90KC5uZ3gtc2hhcmVkKSB7XG4gICAgJjpob3ZlcixcbiAgICAmOmFjdGl2ZSxcbiAgICAmLmFjdGl2ZSB7XG4gICAgICAmOm5vdCg6ZGlzYWJsZWQsIC5kaXNhYmxlZCkge1xuICAgICAgICAuZHBnLWljb24tdW5kbzo6YmVmb3JlLCAuYWhlLWljb24tdW5kbzo6YmVmb3JlIHtcbiAgICBjb250ZW50OiB1cmwoXCJkYXRhOmltYWdlL3N2Zyt4bWw7Y2hhcnNldD11dGY4LCAlM0NzdmcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJyB2aWV3Qm94PScwIDAgMjQgMjQnJTNFJTNDcGF0aCBmaWxsPSclMjNmZmYnIGQ9J001LjkxNCAxMS45OTdsNC40NSA0LjQ1LS43MDcuNzA3TDQgMTEuNDk3IDkuNjU3IDUuODRsLjcwNy43MDctNC40NSA0LjQ1SDE2YTQgNCAwIDAgMSA0IDR2MWgtMXYtMWEzIDMgMCAwIDAtMy0zSDUuOTE0eicvJTNFJTNDL3N2ZyUzRVwiKTtcbn1cbiAgICAgIH1cbiAgICB9XG4gIH1cbn1cbiJdLCJzb3VyY2VSb290IjoiIn0= */</style><style class="darkreader darkreader--sync" media="screen"></style><style>[_nghost-ng-c2097350896] {
+width: 180px;
+display: block;
+flex: 1;
+}
+/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIndlYnBhY2s6Ly8uL3NyYy9hcHAvc2hhcmVkL2NvbXBvbmVudHMvZ3JvdXAtdGl0bGUvZ3JvdXAtdGl0bGUuY29tcG9uZW50LnNjc3MiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFBQUE7RUFDSSxZQUFBO0VBQ0EsY0FBQTtFQUNBLE9BQUE7QUFDSiIsInNvdXJjZXNDb250ZW50IjpbIjpob3N0e1xuICAgIHdpZHRoOjE4MHB4O1xuICAgIGRpc3BsYXk6YmxvY2s7XG4gICAgZmxleDogMTtcbn1cbiJdLCJzb3VyY2VSb290IjoiIn0= */</style><style class="darkreader darkreader--sync" media="screen"></style><style>.canvas-media[_ngcontent-ng-c2950154173] {
+position: absolute;
+text-align: center;
+z-index: -2;
+}
+.canvas-media[_ngcontent-ng-c2950154173] + .ahe-ui-link[_ngcontent-ng-c2950154173] {
+position: relative;
+z-index: 3;
+}
+
+.label-media[_ngcontent-ng-c2950154173] {
+height: 120px;
+width: 120px;
+margin: 0 auto;
+text-align: center;
+vertical-align: middle;
+line-height: 119px;
+overflow: hidden;
+}
+
+.group-media[_ngcontent-ng-c2950154173] {
+display: flex;
+position: relative;
+}
+.group-media[_ngcontent-ng-c2950154173] .image[_ngcontent-ng-c2950154173] {
+display: block;
+margin: auto;
+line-height: 220px;
+text-align: left;
+}
+
+.ahe-ui-link[_ngcontent-ng-c2950154173] {
+margin: 0;
+padding: 0;
+margin-bottom: 5px;
+}
+.ahe-ui-link[_ngcontent-ng-c2950154173]:focus {
+outline: none;
+}
+
+.image-description-preview[_ngcontent-ng-c2950154173] {
+pointer-events: none;
+}
+
+.d-none[_ngcontent-ng-c2950154173] {
+display: none;
+}
+
+.custom-link[_ngcontent-ng-c2950154173] {
+display: inline-block;
+margin-bottom: 10px;
+}
+
+.empty-desc-container[_ngcontent-ng-c2950154173] {
+height: 34px;
+}
+/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIndlYnBhY2s6Ly8uL3NyYy9hcHAvc2hhcmVkL2NvbXBvbmVudHMvYmFja2dyb3VuZC1pbWFnZS9iYWNrZ3JvdW5kLWltYWdlLmNvbXBvbmVudC5zY3NzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiJBQUFBO0VBQ0Usa0JBQUE7RUFDQSxrQkFBQTtFQUNBLFdBQUE7QUFDRjtBQUFFO0VBQ0Usa0JBQUE7RUFDQSxVQUFBO0FBRUo7O0FBR0E7RUFDRSxhQUFBO0VBQ0EsWUFBQTtFQUNBLGNBQUE7RUFDQSxrQkFBQTtFQUNBLHNCQUFBO0VBQ0Esa0JBQUE7RUFDQSxnQkFBQTtBQUFGOztBQUdBO0VBQ0UsYUFBQTtFQUNBLGtCQUFBO0FBQUY7QUFDRTtFQUNFLGNBQUE7RUFDQSxZQUFBO0VBQ0Esa0JBQUE7RUFDQSxnQkFBQTtBQUNKOztBQUdBO0VBQ0UsU0FBQTtFQUNBLFVBQUE7RUFDQSxrQkFBQTtBQUFGO0FBQ0U7RUFDRSxhQUFBO0FBQ0o7O0FBRUE7RUFDRSxvQkFBQTtBQUNGOztBQUVBO0VBQ0UsYUFBQTtBQUNGOztBQUVBO0VBQ0UscUJBQUE7RUFDQSxtQkFBQTtBQUNGOztBQUNBO0VBQ0UsWUFBQTtBQUVGIiwic291cmNlc0NvbnRlbnQiOlsiLmNhbnZhcy1tZWRpYSB7XG4gIHBvc2l0aW9uOiBhYnNvbHV0ZTtcbiAgdGV4dC1hbGlnbjogY2VudGVyO1xuICB6LWluZGV4OiAtMjtcbiAgKyAuYWhlLXVpLWxpbmsge1xuICAgIHBvc2l0aW9uOiByZWxhdGl2ZTtcbiAgICB6LWluZGV4OiAzO1xuICAgIFxuICB9XG59XG5cbi5sYWJlbC1tZWRpYSB7XG4gIGhlaWdodDogMTIwcHg7XG4gIHdpZHRoOiAxMjBweDtcbiAgbWFyZ2luOiAwIGF1dG87XG4gIHRleHQtYWxpZ246IGNlbnRlcjtcbiAgdmVydGljYWwtYWxpZ246IG1pZGRsZTtcbiAgbGluZS1oZWlnaHQ6IDExOXB4O1xuICBvdmVyZmxvdzogaGlkZGVuO1xufVxuXG4uZ3JvdXAtbWVkaWEge1xuICBkaXNwbGF5OiBmbGV4O1xuICBwb3NpdGlvbjogcmVsYXRpdmU7XG4gIC5pbWFnZSB7XG4gICAgZGlzcGxheTogYmxvY2s7XG4gICAgbWFyZ2luOiBhdXRvO1xuICAgIGxpbmUtaGVpZ2h0OiAyMjBweDtcbiAgICB0ZXh0LWFsaWduOiBsZWZ0O1xuICB9XG59XG5cbi5haGUtdWktbGluayB7XG4gIG1hcmdpbjogMDtcbiAgcGFkZGluZzogMDtcbiAgbWFyZ2luLWJvdHRvbTogNXB4O1xuICAmOmZvY3VzIHtcbiAgICBvdXRsaW5lOiBub25lO1xuICB9XG59XG4uaW1hZ2UtZGVzY3JpcHRpb24tcHJldmlld3tcbiAgcG9pbnRlci1ldmVudHM6IG5vbmU7XG59XG5cbi5kLW5vbmUge1xuICBkaXNwbGF5OiBub25lO1xufVxuXG4uY3VzdG9tLWxpbmt7XG4gIGRpc3BsYXk6IGlubGluZS1ibG9jaztcbiAgbWFyZ2luLWJvdHRvbTogMTBweDtcbn1cbi5lbXB0eS1kZXNjLWNvbnRhaW5lcntcbiAgaGVpZ2h0OiAzNHB4O1xufSJdLCJzb3VyY2VSb290IjoiIn0= */</style><style class="darkreader darkreader--sync" media="screen"></style><style>.drop-zone[_ngcontent-ng-c167353020] {
+min-height: 220px;
+border: 1px solid #007c91;
+background-color: #fff;
+border-radius: 5px;
+}
+
+.single-drop-zone[_ngcontent-ng-c167353020] {
+min-height: 220px;
+}
+/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIndlYnBhY2s6Ly8uL3NyYy9hcHAvdGVzdC1yZXZpZXcvdGVzdC90ZXN0LWdyb3VwL3Rlc3QtZ3JvdXAtZHJvcHpvbmUvdGVzdC1ncm91cC1kcm9wem9uZS5jb21wb25lbnQuc2NzcyIsIndlYnBhY2s6Ly8uL3NyYy9hcHAvc3R5bGVzL19jb2xvcnMuc2NzcyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFFQTtFQUNFLGlCQUFBO0VBQ0EseUJBQUE7RUFDQSxzQkNDWTtFREFaLGtCQUFBO0FBREY7O0FBSUE7RUFDRSxpQkFBQTtBQURGIiwic291cmNlc0NvbnRlbnQiOlsiQGltcG9ydCAnLi4vLi4vLi4vLi4vc3R5bGVzL3ZhcmlhYmxlcyc7XG5cbi5kcm9wLXpvbmUge1xuICBtaW4taGVpZ2h0OiAyMjBweDtcbiAgYm9yZGVyOiAxcHggc29saWQgJHNreS1ibHVlLTEyMDtcbiAgYmFja2dyb3VuZC1jb2xvcjogJGNvbG9yLXdoaXRlO1xuICBib3JkZXItcmFkaXVzOiA1cHg7XG59XG5cbi5zaW5nbGUtZHJvcC16b25lIHtcbiAgbWluLWhlaWdodDogMjIwcHg7XG59XG4iLCIvL1xuLy8gR2liYnMgY29sb3JzXG4vL1xuXG4kY29sb3ItYmxhY2s6ICMwMDA7XG4kY29sb3ItZ3JheTogI2NjYztcbiRjb2xvci13aGl0ZTogI2ZmZjtcblxuLy8gR3JheWlzaCBibHVlXG4kZ3JheS0wMTogI2YwZjNmNDtcbiRncmF5LTAyOiAjZTBlN2U5O1xuJGdyYXktMDM6ICNkMWRiZGU7XG4kZ3JheS0wNDogI2MxY2ZkNDtcbiRncmF5LTA1OiAjYjJjM2M5O1xuJGdyYXktMDY6ICNhMmI4YmU7XG4kZ3JheS0wNzogIzkzYWNiMztcbiRncmF5LTA4OiAjODNhMGE4O1xuJGdyYXktMDk6ICM3NDk0OWQ7XG4kZ3JheS0xMDogIzY0ODg5MjtcbiRncmF5LTExOiAjNTU3Yzg3O1xuJGdyYXktMTI6ICM0NTcwN2Q7XG4kZ3JheS0xMzogIzM2NjQ3MjtcbiRncmF5LTE0OiAjMjY1ODY3O1xuJGdyYXktMTU6ICMxNzRkNWM7XG4kZ3JheS0xNjogIzAwM2I0YztcbiRncmF5LTE3OiAjMDAzMjQxO1xuJGdyYXktMTg6ICMwMDIxMmI7XG5cbi8vIFByaW1hcnkgQ29sb3JzXG4kZGFyay1ibHVlLTQwOiAkZ3JheS0wMTtcbiRkYXJrLWJsdWUtNjA6ICRncmF5LTAzO1xuJGRhcmstYmx1ZS04MDogJGdyYXktMDg7XG4kZGFyay1ibHVlLTEwMDogIzQ2NzA3ZDsgLy8gYmFzZSBjb2xvclxuJGRhcmstYmx1ZS0xMjA6ICRncmF5LTE0O1xuJGRhcmstYmx1ZS0xNDA6ICRncmF5LTE2O1xuXG4kaGVyaXRhZ2UtcmVkLTQwOiAjZmRlZGVkO1xuJGhlcml0YWdlLXJlZC02MDogI2YzYTRhNztcbiRoZXJpdGFnZS1yZWQtODA6ICNlYTViNjA7XG4kaGVyaXRhZ2UtcmVkLTEwMDogI2UyMWYyNjsgLy8gYmFzZSBjb2xvclxuJGhlcml0YWdlLXJlZC0xMjA6ICNiMDE4MWU7XG4kaGVyaXRhZ2UtcmVkLTE0MDogIzc1MTAxNDtcblxuJHNreS1ibHVlLTQwOiAjZDJlZGYyO1xuJHNreS1ibHVlLTYwOiAjYTRkYmU1O1xuJHNreS1ibHVlLTgwOiAjNjBjMWQxO1xuJHNreS1ibHVlLTEwMDogIzAwOWJiNTsgLy8gYmFzZSBjb2xvclxuJHNreS1ibHVlLTEyMDogIzAwN2M5MTtcbiRza3ktYmx1ZS0xNDA6ICMwMDZhN2M7XG5cbi8vIFNlY29uZGFyeSBjb2xvcnNcbiRmb3Jlc3QtZ3JlZW4tNDA6ICNkZmVmZTI7XG4kZm9yZXN0LWdyZWVuLTYwOiAjOTZkN2ExO1xuJGZvcmVzdC1ncmVlbi04MDogIzY0YmQ3MztcbiRmb3Jlc3QtZ3JlZW4tMTAwOiAjM2RhMDRlOyAvLyBiYXNlIGNvbG9yXG4kZm9yZXN0LWdyZWVuLTEyMDogIzIzODgzNDtcbiRmb3Jlc3QtZ3JlZW4tMTQwOiAjMGM2YjFkO1xuXG4kbGlnaHQtZ3JlZW4tNDA6ICNkYmVlZTg7XG4kbGlnaHQtZ3JlZW4tNjA6ICNjOWU1ZGM7XG4kbGlnaHQtZ3JlZW4tODA6ICNhNWQ0YzU7XG4kbGlnaHQtZ3JlZW4tMTAwOiAjN2FiZmFhOyAvLyBiYXNlIGNvbG9yXG4kbGlnaHQtZ3JlZW4tMTIwOiAjNDg5YTgxO1xuJGxpZ2h0LWdyZWVuLTE0MDogIzI0N2M2MTtcblxuJHllbGxvdy00MDogI2ZmZjVjYztcbiR5ZWxsb3ctNjA6ICNmZmViOTk7XG4keWVsbG93LTgwOiAjZmZkYzRkO1xuJHllbGxvdy0xMDA6ICNmZmNkMDA7IC8vIGJhc2UgY29sb3JcbiR5ZWxsb3ctMTIwOiAjZDhhZDAwO1xuJHllbGxvdy0xNDA6ICNhYjgyMDA7XG5cbiRzYWxtb24tNDA6ICNmY2RjZDk7XG4kc2FsbW9uLTYwOiAjZjliOWIyO1xuJHNhbG1vbi04MDogI2Y2OTY4YztcbiRzYWxtb24tMTAwOiAjZjE1YTRhOyAvLyBiYXNlIGNvbG9yXG4kc2FsbW9uLTEyMDogI2NkNGQzZjtcbiRzYWxtb24tMTQwOiAjOWYzYzMxO1xuXG4kYmx1ZS00MDogI2RhZTdmMTtcbiRibHVlLTYwOiAjYTNjNGRiO1xuJGJsdWUtODA6ICM2ZGExYzU7XG4kYmx1ZS0xMDA6ICMzZjdhYTM7IC8vIGJhc2UgY29sb3JcbiRibHVlLTEyMDogIzMyNjA4MTtcbiRibHVlLTE0MDogIzJhNTA2YjtcblxuJGluZGlnby00MDogI2U0ZTJlYTtcbiRpbmRpZ28tNjA6ICNjOWM2ZDU7XG4kaW5kaWdvLTgwOiAjYTE5YWI2O1xuJGluZGlnby0xMDA6ICM3NTZiOTM7IC8vIGJhc2UgY29sb3JcbiRpbmRpZ28tMTIwOiAjNjE1ODc5O1xuJGluZGlnby0xNDA6ICM0MjM4NjA7Il0sInNvdXJjZVJvb3QiOiIifQ== */</style><style class="darkreader darkreader--sync" media="screen"></style><style>
+</style><style class="darkreader darkreader--sync" media="screen"></style><style>.label-box[_ngcontent-ng-c1967286177] {
+width: 150px;
+height: auto;
+min-height: 60px;
+border-radius: 3px;
+border: solid 1px #007c91;
+background-color: #fff;
+text-align: center;
+position: relative;
+justify-content: center;
+flex-direction: column;
+display: flex;
+}
+.label-box[_ngcontent-ng-c1967286177] .text-content[_ngcontent-ng-c1967286177] {
+padding: 5px;
+border-bottom: 1px solid #007c91;
+align-items: center;
+text-align: center;
+display: flex;
+justify-content: center;
+}
+.label-box.text[_ngcontent-ng-c1967286177] {
+justify-content: center;
+align-items: center;
+display: flex;
+}
+
+[_ngcontent-ng-c1967286177]:focus {
+outline: 2px solid #003b4c;
+outline-offset: 0px !important;
+}
+
+.audio-without-text[_ngcontent-ng-c1967286177] {
+display: flex;
+align-items: center;
+justify-content: center;
+height: 100%;
+}
+
+.disabled[_ngcontent-ng-c1967286177] {
+opacity: 0.5;
+cursor: not-allowed !important;
+border: solid 1px #007c91;
+}
+
+.grab-cursor[_ngcontent-ng-c1967286177] {
+cursor: grab;
+}
+
+.correct-answer[_ngcontent-ng-c1967286177] {
+border: 1px solid #238834;
+}
+.correct-answer[_ngcontent-ng-c1967286177] .feedback-text[_ngcontent-ng-c1967286177] {
+background-color: #238834;
+color: white;
+font-size: 12px;
+position: absolute;
+top: -8px;
+left: 5px;
+border-radius: 25px;
+padding: 0 10px;
+}
+
+.incorrect-answer[_ngcontent-ng-c1967286177] {
+border: solid 1px #b0181e;
+}
+.incorrect-answer[_ngcontent-ng-c1967286177] .feedback-text[_ngcontent-ng-c1967286177] {
+background-color: #b0181e;
+color: white;
+font-size: 12px;
+position: absolute;
+top: -8px;
+left: 5px;
+border-radius: 25px;
+padding: 0 10px;
+}
+/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIndlYnBhY2s6Ly8uL3NyYy9hcHAvc2hhcmVkL2NvbXBvbmVudHMvbGFiZWxzL3NpbmdsZS1sYWJlbC9zaW5nbGUtbGFiZWwuY29tcG9uZW50LnNjc3MiLCJ3ZWJwYWNrOi8vLi9zcmMvYXBwL3N0eWxlcy9fY29sb3JzLnNjc3MiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFBRUE7RUFDRSxZQUFBO0VBQ0EsWUFBQTtFQUNBLGdCQUFBO0VBQ0Esa0JBQUE7RUFDQSx5QkFBQTtFQUNBLHNCQ0ZZO0VER1osa0JBQUE7RUFDQSxrQkFBQTtFQUNBLHVCQUFBO0VBQ0Esc0JBQUE7RUFDQSxhQUFBO0FBREY7QUFHRTtFQUNFLFlBQUE7RUFDQSxnQ0FBQTtFQUNBLG1CQUFBO0VBQ0Esa0JBQUE7RUFDQSxhQUFBO0VBQ0EsdUJBQUE7QUFESjtBQUlFO0VBQ0UsdUJBQUE7RUFDQSxtQkFBQTtFQUNBLGFBQUE7QUFGSjs7QUFNQTtFQUNFLDBCQUFBO0VBQ0EsOEJBQUE7QUFIRjs7QUFNQTtFQUNFLGFBQUE7RUFDQSxtQkFBQTtFQUNBLHVCQUFBO0VBQ0EsWUFBQTtBQUhGOztBQU1BO0VBQ0UsWUFBQTtFQUNBLDhCQUFBO0VBQ0EseUJBQUE7QUFIRjs7QUFNQTtFQUNFLFlBQUE7QUFIRjs7QUFNQTtFQUNFLHlCQUFBO0FBSEY7QUFLRTtFQUNFLHlCQUFBO0VBQ0EsWUFBQTtFQUNBLGVBQUE7RUFDQSxrQkFBQTtFQUNBLFNBQUE7RUFDQSxTQUFBO0VBQ0EsbUJBQUE7RUFDQSxlQUFBO0FBSEo7O0FBT0E7RUFDRSx5QkFBQTtBQUpGO0FBTUU7RUFDRSx5QkFBQTtFQUNBLFlBQUE7RUFDQSxlQUFBO0VBQ0Esa0JBQUE7RUFDQSxTQUFBO0VBQ0EsU0FBQTtFQUNBLG1CQUFBO0VBQ0EsZUFBQTtBQUpKIiwic291cmNlc0NvbnRlbnQiOlsiQGltcG9ydCAnLi4vLi4vLi4vLi4vc3R5bGVzL3ZhcmlhYmxlcyc7XG5cbi5sYWJlbC1ib3gge1xuICB3aWR0aDogMTUwcHg7XG4gIGhlaWdodDogYXV0bztcbiAgbWluLWhlaWdodDogNjBweDtcbiAgYm9yZGVyLXJhZGl1czogM3B4O1xuICBib3JkZXI6IHNvbGlkIDFweCAkc2t5LWJsdWUtMTIwO1xuICBiYWNrZ3JvdW5kLWNvbG9yOiAkY29sb3Itd2hpdGU7XG4gIHRleHQtYWxpZ246IGNlbnRlcjtcbiAgcG9zaXRpb246IHJlbGF0aXZlO1xuICBqdXN0aWZ5LWNvbnRlbnQ6IGNlbnRlcjtcbiAgZmxleC1kaXJlY3Rpb246IGNvbHVtbjtcbiAgZGlzcGxheTogZmxleDtcblxuICAudGV4dC1jb250ZW50IHtcbiAgICBwYWRkaW5nOiA1cHg7XG4gICAgYm9yZGVyLWJvdHRvbTogMXB4IHNvbGlkICRza3ktYmx1ZS0xMjA7XG4gICAgYWxpZ24taXRlbXM6IGNlbnRlcjtcbiAgICB0ZXh0LWFsaWduOiBjZW50ZXI7XG4gICAgZGlzcGxheTogZmxleDtcbiAgICBqdXN0aWZ5LWNvbnRlbnQ6IGNlbnRlcjtcbiAgfVxuXG4gICYudGV4dCB7XG4gICAganVzdGlmeS1jb250ZW50OiBjZW50ZXI7XG4gICAgYWxpZ24taXRlbXM6IGNlbnRlcjtcbiAgICBkaXNwbGF5OiBmbGV4O1xuICB9XG59XG5cbjpmb2N1cyB7XG4gIG91dGxpbmU6IDJweCBzb2xpZCAjMDAzYjRjO1xuICBvdXRsaW5lLW9mZnNldDogMHB4ICFpbXBvcnRhbnQ7XG59XG5cbi5hdWRpby13aXRob3V0LXRleHQge1xuICBkaXNwbGF5OiBmbGV4O1xuICBhbGlnbi1pdGVtczogY2VudGVyO1xuICBqdXN0aWZ5LWNvbnRlbnQ6IGNlbnRlcjtcbiAgaGVpZ2h0OiAxMDAlO1xufVxuXG4uZGlzYWJsZWQge1xuICBvcGFjaXR5OiAwLjU7XG4gIGN1cnNvcjogbm90LWFsbG93ZWQgIWltcG9ydGFudDtcbiAgYm9yZGVyOiBzb2xpZCAxcHggJHNreS1ibHVlLTEyMDtcbn1cblxuLmdyYWItY3Vyc29yIHtcbiAgY3Vyc29yOiBncmFiO1xufVxuXG4uY29ycmVjdC1hbnN3ZXIge1xuICBib3JkZXI6IDFweCBzb2xpZCAjMjM4ODM0O1xuXG4gIC5mZWVkYmFjay10ZXh0IHtcbiAgICBiYWNrZ3JvdW5kLWNvbG9yOiAjMjM4ODM0O1xuICAgIGNvbG9yOiB3aGl0ZTtcbiAgICBmb250LXNpemU6IDEycHg7XG4gICAgcG9zaXRpb246IGFic29sdXRlO1xuICAgIHRvcDogLThweDtcbiAgICBsZWZ0OiA1cHg7XG4gICAgYm9yZGVyLXJhZGl1czogMjVweDtcbiAgICBwYWRkaW5nOiAwIDEwcHg7XG4gIH1cbn1cblxuLmluY29ycmVjdC1hbnN3ZXIge1xuICBib3JkZXI6IHNvbGlkIDFweCAjYjAxODFlO1xuXG4gIC5mZWVkYmFjay10ZXh0IHtcbiAgICBiYWNrZ3JvdW5kLWNvbG9yOiAjYjAxODFlO1xuICAgIGNvbG9yOiB3aGl0ZTtcbiAgICBmb250LXNpemU6IDEycHg7XG4gICAgcG9zaXRpb246IGFic29sdXRlO1xuICAgIHRvcDogLThweDtcbiAgICBsZWZ0OiA1cHg7XG4gICAgYm9yZGVyLXJhZGl1czogMjVweDtcbiAgICBwYWRkaW5nOiAwIDEwcHg7XG4gIH1cbn0iLCIvL1xuLy8gR2liYnMgY29sb3JzXG4vL1xuXG4kY29sb3ItYmxhY2s6ICMwMDA7XG4kY29sb3ItZ3JheTogI2NjYztcbiRjb2xvci13aGl0ZTogI2ZmZjtcblxuLy8gR3JheWlzaCBibHVlXG4kZ3JheS0wMTogI2YwZjNmNDtcbiRncmF5LTAyOiAjZTBlN2U5O1xuJGdyYXktMDM6ICNkMWRiZGU7XG4kZ3JheS0wNDogI2MxY2ZkNDtcbiRncmF5LTA1OiAjYjJjM2M5O1xuJGdyYXktMDY6ICNhMmI4YmU7XG4kZ3JheS0wNzogIzkzYWNiMztcbiRncmF5LTA4OiAjODNhMGE4O1xuJGdyYXktMDk6ICM3NDk0OWQ7XG4kZ3JheS0xMDogIzY0ODg5MjtcbiRncmF5LTExOiAjNTU3Yzg3O1xuJGdyYXktMTI6ICM0NTcwN2Q7XG4kZ3JheS0xMzogIzM2NjQ3MjtcbiRncmF5LTE0OiAjMjY1ODY3O1xuJGdyYXktMTU6ICMxNzRkNWM7XG4kZ3JheS0xNjogIzAwM2I0YztcbiRncmF5LTE3OiAjMDAzMjQxO1xuJGdyYXktMTg6ICMwMDIxMmI7XG5cbi8vIFByaW1hcnkgQ29sb3JzXG4kZGFyay1ibHVlLTQwOiAkZ3JheS0wMTtcbiRkYXJrLWJsdWUtNjA6ICRncmF5LTAzO1xuJGRhcmstYmx1ZS04MDogJGdyYXktMDg7XG4kZGFyay1ibHVlLTEwMDogIzQ2NzA3ZDsgLy8gYmFzZSBjb2xvclxuJGRhcmstYmx1ZS0xMjA6ICRncmF5LTE0O1xuJGRhcmstYmx1ZS0xNDA6ICRncmF5LTE2O1xuXG4kaGVyaXRhZ2UtcmVkLTQwOiAjZmRlZGVkO1xuJGhlcml0YWdlLXJlZC02MDogI2YzYTRhNztcbiRoZXJpdGFnZS1yZWQtODA6ICNlYTViNjA7XG4kaGVyaXRhZ2UtcmVkLTEwMDogI2UyMWYyNjsgLy8gYmFzZSBjb2xvclxuJGhlcml0YWdlLXJlZC0xMjA6ICNiMDE4MWU7XG4kaGVyaXRhZ2UtcmVkLTE0MDogIzc1MTAxNDtcblxuJHNreS1ibHVlLTQwOiAjZDJlZGYyO1xuJHNreS1ibHVlLTYwOiAjYTRkYmU1O1xuJHNreS1ibHVlLTgwOiAjNjBjMWQxO1xuJHNreS1ibHVlLTEwMDogIzAwOWJiNTsgLy8gYmFzZSBjb2xvclxuJHNreS1ibHVlLTEyMDogIzAwN2M5MTtcbiRza3ktYmx1ZS0xNDA6ICMwMDZhN2M7XG5cbi8vIFNlY29uZGFyeSBjb2xvcnNcbiRmb3Jlc3QtZ3JlZW4tNDA6ICNkZmVmZTI7XG4kZm9yZXN0LWdyZWVuLTYwOiAjOTZkN2ExO1xuJGZvcmVzdC1ncmVlbi04MDogIzY0YmQ3MztcbiRmb3Jlc3QtZ3JlZW4tMTAwOiAjM2RhMDRlOyAvLyBiYXNlIGNvbG9yXG4kZm9yZXN0LWdyZWVuLTEyMDogIzIzODgzNDtcbiRmb3Jlc3QtZ3JlZW4tMTQwOiAjMGM2YjFkO1xuXG4kbGlnaHQtZ3JlZW4tNDA6ICNkYmVlZTg7XG4kbGlnaHQtZ3JlZW4tNjA6ICNjOWU1ZGM7XG4kbGlnaHQtZ3JlZW4tODA6ICNhNWQ0YzU7XG4kbGlnaHQtZ3JlZW4tMTAwOiAjN2FiZmFhOyAvLyBiYXNlIGNvbG9yXG4kbGlnaHQtZ3JlZW4tMTIwOiAjNDg5YTgxO1xuJGxpZ2h0LWdyZWVuLTE0MDogIzI0N2M2MTtcblxuJHllbGxvdy00MDogI2ZmZjVjYztcbiR5ZWxsb3ctNjA6ICNmZmViOTk7XG4keWVsbG93LTgwOiAjZmZkYzRkO1xuJHllbGxvdy0xMDA6ICNmZmNkMDA7IC8vIGJhc2UgY29sb3JcbiR5ZWxsb3ctMTIwOiAjZDhhZDAwO1xuJHllbGxvdy0xNDA6ICNhYjgyMDA7XG5cbiRzYWxtb24tNDA6ICNmY2RjZDk7XG4kc2FsbW9uLTYwOiAjZjliOWIyO1xuJHNhbG1vbi04MDogI2Y2OTY4YztcbiRzYWxtb24tMTAwOiAjZjE1YTRhOyAvLyBiYXNlIGNvbG9yXG4kc2FsbW9uLTEyMDogI2NkNGQzZjtcbiRzYWxtb24tMTQwOiAjOWYzYzMxO1xuXG4kYmx1ZS00MDogI2RhZTdmMTtcbiRibHVlLTYwOiAjYTNjNGRiO1xuJGJsdWUtODA6ICM2ZGExYzU7XG4kYmx1ZS0xMDA6ICMzZjdhYTM7IC8vIGJhc2UgY29sb3JcbiRibHVlLTEyMDogIzMyNjA4MTtcbiRibHVlLTE0MDogIzJhNTA2YjtcblxuJGluZGlnby00MDogI2U0ZTJlYTtcbiRpbmRpZ28tNjA6ICNjOWM2ZDU7XG4kaW5kaWdvLTgwOiAjYTE5YWI2O1xuJGluZGlnby0xMDA6ICM3NTZiOTM7IC8vIGJhc2UgY29sb3JcbiRpbmRpZ28tMTIwOiAjNjE1ODc5O1xuJGluZGlnby0xNDA6ICM0MjM4NjA7Il0sInNvdXJjZVJvb3QiOiIifQ== */</style><style class="darkreader darkreader--sync" media="screen"></style></head>
+
+<body>
+<div id="loader" class="ahe-ui-loading-spinner" style="display: none;">
+<div class="loader">
+<svg aria-hidden="true" class="circular" focusable="false" viewBox="25 25 50 50">
+<circle cx="50" cy="50" fill="none" r="20" stroke="white" stroke-width="2" data-darkreader-inline-stroke="" style="--darkreader-inline-stroke: var(--darkreader-text-ffffff, #e8e6e3);">
+</circle>
+<circle class="path" cx="50" cy="50" fill="none" r="20" stroke-miterlimit="10" stroke-width="2">
+</circle>
+</svg>
+</div>
+</div>
+<app-root _nghost-ng-c3611333615="" ng-version="16.2.12"><router-outlet _ngcontent-ng-c3611333615=""></router-outlet><app-test _nghost-ng-c3553685630=""><div _ngcontent-ng-c3553685630="" class="app-wrap app-border"><div _ngcontent-ng-c3553685630="" class="canvas-stage d-flex"><section _ngcontent-ng-c3553685630="" aria-label="labels" class="app-shared-labels" _nghost-ng-c3596845669=""><div _ngcontent-ng-c3596845669="" id="labelContainer" class="label-wrap"><div _ngcontent-ng-c3596845669="" class="label-header d-flex align-items-center label-component"><h2 _ngcontent-ng-c3596845669="" class="m-0">Labels</h2><button _ngcontent-ng-c3596845669="" mhe-button="" purpose="btn-icon" panelclass="instruction-popover" placement="right" _nghost-ng-c649937084="" ng-reflect-purpose="btn-icon" ng-reflect-placement="right" ng-reflect-ngb-popover="[object Object]" aria-label="Instructions" class="btn ngx-shared btn-icon" type="button"><span _ngcontent-ng-c3596845669=""><i _ngcontent-ng-c3596845669="" class="dpg-icon ngx-icon_30x30 dpg-icon-moreinfo"><span _ngcontent-ng-c3596845669="" class="sr-only"></span></i></span></button><!--container--><!--container--><!--ng-container--><!--bindings={
+"ng-reflect-ng-if": "true"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div><app-skip-link _ngcontent-ng-c3596845669="" type="label" _nghost-ng-c2240004928="" ng-reflect-type="label"><a _ngcontent-ng-c2240004928="" class="ahe-ui-link skip-link skip-link--label">Skip to Drop Zones</a><!--ng-container--><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-skip-link><div _ngcontent-ng-c3596845669="" id="label-list" class="label-list note-list label-popover"><ul _ngcontent-ng-c3596845669=""><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="0"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="10" tabindex="0" aria-label="Little emphasis on sociocultural context Label 1 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_10" style="min-height: 81px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Little emphasis on sociocultural context</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="1"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="2" tabindex="0" aria-label="Constructivism Label 2 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_2" style="min-height: 60px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Constructivism</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="2"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="8" tabindex="0" aria-label="Language shapes thought Label 3 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_8" style="min-height: 60px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Language shapes thought</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="3"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="16" tabindex="0" aria-label="Conservation Label 4 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_16" style="min-height: 60px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Conservation</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="4"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="4" tabindex="0" aria-label="Zone of proximal development Label 5 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_4" style="min-height: 60px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Zone of proximal development</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="5"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="14" tabindex="0" aria-label="Assimilation Label 6 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_14" style="min-height: 60px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Assimilation</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="6"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="17" tabindex="0" aria-label="Classification Label 7 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_17" style="min-height: 60px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Classification</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="7"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="7" tabindex="0" aria-label="Tools of the culture Label 8 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_7" style="min-height: 60px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Tools of the culture</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="8"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="18" tabindex="0" aria-label="Language plays a minor role Label 9 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_18" style="min-height: 60px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Language plays a minor role</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="9"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="9" tabindex="0" aria-label="Give children opportunities to learn with a teacher and more skilled peers Label 10 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_9" style="min-height: 126px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Give children opportunities to learn with a teacher and more skilled peers</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="10"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="11" tabindex="0" aria-label="Cognitive constructivist Label 11 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_11" style="min-height: 60px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Cognitive constructivist</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="11"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="5" tabindex="0" aria-label="Education is very important Label 12 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_5" style="min-height: 60px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Education is very important</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="12"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="1" tabindex="0" aria-label="Strong emphasis on sociocultural context Label 13 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_1" style="min-height: 81px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Strong emphasis on sociocultural context</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="13"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="6" tabindex="0" aria-label="Dialogue Label 14 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_6" style="min-height: 60px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Dialogue</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="14"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="20" tabindex="0" aria-label="Teacher provides support for children to discover knowledge Label 15 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_20" style="min-height: 103px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Teacher provides support for children to discover knowledge</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="15"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="13" tabindex="0" aria-label="Schema Label 16 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_13" style="min-height: 60px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Schema</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="16"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="15" tabindex="0" aria-label="Accommodation Label 17 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_15" style="min-height: 60px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Accommodation</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="17"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="12" tabindex="0" aria-label="Strong emphasis on stages Label 18 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_12" style="min-height: 60px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Strong emphasis on stages</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="18"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="3" tabindex="0" aria-label="No general stages of development Label 19 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_3" style="min-height: 60px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">No general stages of development</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><li _ngcontent-ng-c3596845669="" class="label-item" ng-reflect-ng-class="[object Object]"><div _ngcontent-ng-c3596845669="" class="d-flex"><app-shared-single-label _ngcontent-ng-c3596845669="" _nghost-ng-c1967286177="" ng-reflect-label="[object Object]" ng-reflect-is-inside-dropzone="false" ng-reflect-index="19"><div _ngcontent-ng-c1967286177="" apppickdrop="" class="label-box text grab-cursor draggable" ng-reflect-ng-class="grab-cursor draggable " labelid="19" tabindex="0" aria-label="Cognition directs language Label 20 of 20. Press space bar to lift the Label" aria-pressed="false" role="button" aria-disabled="false" id="label_19" style="min-height: 60px;"><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><p _ngcontent-ng-c1967286177="" class="m-0 p-1 label-text">Cognition directs language</p></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-shared-single-label><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></div></li><!--bindings={
+"ng-reflect-ng-for-of": "[object Object],[object Object"
+}--></ul></div></div></section><!--bindings={
+"ng-reflect-ng-switch-case": "labeling"
+}--><section _ngcontent-ng-c3553685630="" aria-label="Dropzone" class="dropzone-wrap"><div _ngcontent-ng-c3553685630="" id="droZoneContainer" class="app-test-group svg-wrap" _nghost-ng-c1823468225=""><div _ngcontent-ng-c1823468225="" class="app-undo-reset" _nghost-ng-c4174148129=""><div _ngcontent-ng-c4174148129="" class="header"><h2 _ngcontent-ng-c4174148129="" class="m-0">Drop Zones</h2><button _ngcontent-ng-c4174148129="" mhe-button="" placement="bottom" apptooltip="Undo" class="btn ngx-shared btn-icon undo-button" _nghost-ng-c649937084="" ng-reflect-purpose="btn-icon" disabled="" type="button"><i _ngcontent-ng-c4174148129="" class="dpg-icon ngx-icon_30x30 dpg-icon-undo"><span _ngcontent-ng-c4174148129="" aria-hidden="true" class="sr-only">Undo</span></i></button><button _ngcontent-ng-c4174148129="" mhe-button="" class="btn ngx-shared btn-secondary button" _nghost-ng-c649937084="" disabled="" ng-reflect-purpose="btn-secondary" type="button">Reset All</button><!--ng-container--><!--bindings={
+"ng-reflect-ng-if": "true"
+}--></div></div><div _ngcontent-ng-c1823468225="" id="js-groupActivityContainer" class="group-container" style="max-width: 574px;"><div _ngcontent-ng-c1823468225="" class="groups"><app-group-title _ngcontent-ng-c1823468225="" _nghost-ng-c2097350896="" ng-reflect-group="[object Object]"><h3 _ngcontent-ng-c2097350896="">Piaget (1/2)</h3></app-group-title><app-background-image _ngcontent-ng-c1823468225="" _nghost-ng-c2950154173="" ng-reflect-background-image="[object Object]" ng-reflect-image-type="group" ng-reflect-group="[object Object]" ng-reflect-group-index="0"><!--bindings={
+"ng-reflect-ng-switch-case": "canvas"
+}--><!--bindings={
+"ng-reflect-ng-switch-case": "label"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-switch-case": "group"
+}--><!--ng-container--></app-background-image><!--ng-container--><div _ngcontent-ng-c1823468225="" class="single-group"><app-test-group-dropzone _ngcontent-ng-c1823468225="" _nghost-ng-c167353020="" ng-reflect-group="[object Object]" ng-reflect-index="0"><div _ngcontent-ng-c167353020="" class="drop-zone dropable" id="dropzone_1" dropzoneid="1" style="min-height: 946px;"><div _ngcontent-ng-c167353020="" class="single-drop-zone"><!--bindings={
+"ng-reflect-ng-for-of": ""
+}--><span _ngcontent-ng-c167353020="" class="sr-only">Empty drop zone 1 of 2 corresponding to the group Piaget</span><!--ng-container--><!--bindings={
+"ng-reflect-ng-if": "true"
+}--></div></div></app-test-group-dropzone></div></div><div _ngcontent-ng-c1823468225="" class="groups"><app-group-title _ngcontent-ng-c1823468225="" _nghost-ng-c2097350896="" ng-reflect-group="[object Object]"><h3 _ngcontent-ng-c2097350896="">Vygotsky (2/2)</h3></app-group-title><app-background-image _ngcontent-ng-c1823468225="" _nghost-ng-c2950154173="" ng-reflect-background-image="[object Object]" ng-reflect-image-type="group" ng-reflect-group="[object Object]" ng-reflect-group-index="1"><!--bindings={
+"ng-reflect-ng-switch-case": "canvas"
+}--><!--bindings={
+"ng-reflect-ng-switch-case": "label"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--><!--bindings={
+"ng-reflect-ng-switch-case": "group"
+}--><!--ng-container--></app-background-image><!--ng-container--><div _ngcontent-ng-c1823468225="" class="single-group"><app-test-group-dropzone _ngcontent-ng-c1823468225="" _nghost-ng-c167353020="" ng-reflect-group="[object Object]" ng-reflect-index="1"><div _ngcontent-ng-c167353020="" class="drop-zone dropable" id="dropzone_2" dropzoneid="2" style="min-height: 946px;"><div _ngcontent-ng-c167353020="" class="single-drop-zone"><!--bindings={
+"ng-reflect-ng-for-of": ""
+}--><span _ngcontent-ng-c167353020="" class="sr-only">Empty drop zone 2 of 2 corresponding to the group Vygotsky</span><!--ng-container--><!--bindings={
+"ng-reflect-ng-if": "true"
+}--></div></div></app-test-group-dropzone></div></div><!--bindings={
+"ng-reflect-ng-for-of": "[object Object],[object Object"
+}--></div><app-skip-link _ngcontent-ng-c1823468225="" type="canvas" _nghost-ng-c2240004928="" ng-reflect-type="canvas"><a _ngcontent-ng-c2240004928="" class="ahe-ui-link skip-link skip-link--canvas">Skip to Labels</a><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-skip-link></div></section><!--bindings={
+"ng-reflect-ng-switch-case": "grouping"
+}--><!--ng-container--></div></div><!--bindings={
+"ng-reflect-ng-if-else": "[object Object]"
+}--><!--container--></app-test><!--container--><!--bindings={
+"ng-reflect-ng-if": "true"
+}--><!--bindings={
+"ng-reflect-ng-if": "false"
+}--></app-root>
+
+<script src="runtime.js" type="module"></script><script src="polyfills.js" type="module"></script><script src="scripts.js" defer=""></script><script src="vendor.js" type="module"></script><script src="main.js" type="module"></script>
+
+<div class="cdk-live-announcer-element cdk-visually-hidden" aria-atomic="true" aria-live="polite" id="cdk-live-announcer-0"></div></body></html>

@@ -690,6 +690,19 @@ async function insertQuestion(questionData) {
     }
     text +=
       '\n\nThis is an ordering question. Set "answer" to an array containing the options in correct top-to-bottom order. Include each option exactly once and use the exact option text.';
+  } else if (type === "click_and_drag") {
+    const labels = Array.isArray(options?.labels) ? options.labels : [];
+    const categories = Array.isArray(options?.categories) ? options.categories : [];
+    if (labels.length > 0) {
+      text += "\nLabels:\n" + labels.map((label, i) => `${i + 1}. ${label}`).join("\n");
+    }
+    if (categories.length > 0) {
+      text +=
+        "\nCategories:\n" +
+        categories.map((category, i) => `${i + 1}. ${category}`).join("\n");
+    }
+    text +=
+      '\n\nThis is a click-and-drag labeling question. Set "answer" to an array of strings using the exact format "Label -> Category". Use exact label and category text, include each label exactly once, and do not include any labels or categories not listed.';
   } else if (options && options.length > 0) {
     text +=
       "\nOptions:\n" + options.map((opt, i) => `${i + 1}. ${opt}`).join("\n");
