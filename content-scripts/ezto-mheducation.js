@@ -40,6 +40,10 @@ const CLICK_AND_DRAG_MOVE_MAX_PASSES = 3;
 const CLICK_AND_DRAG_MOVE_MAX_KEYBOARD_STEPS = 8;
 const MULTIPLE_CHOICE_MATCH_THRESHOLD = 0.78;
 const MULTIPLE_CHOICE_MATCH_MARGIN = 0.08;
+const CLICK_AND_DRAG_IFRAME_READY_TIMEOUT_MS = 12000;
+const CLICK_AND_DRAG_FORMAT_RETRY_LIMIT = 1;
+const clickAndDragFormatRetryAttemptsBySignature = new Map();
+const clickAndDragFormatIssueBySignature = new Map();
 
 function createQuestionId() {
   questionSequence += 1;
@@ -84,6 +88,32 @@ function markQuestionPerf(questionId, key, timestamp = Date.now()) {
 function clearQuestionPerf(questionId) {
   if (!questionId) return;
   questionPerfMarks.delete(questionId);
+}
+
+function clearClickAndDragFormatRetryState(signature = "") {
+  const normalizedSignature = normalizeQuizText(signature);
+  if (normalizedSignature) {
+    clickAndDragFormatRetryAttemptsBySignature.delete(normalizedSignature);
+    clickAndDragFormatIssueBySignature.delete(normalizedSignature);
+    return;
+  }
+
+  clickAndDragFormatRetryAttemptsBySignature.clear();
+  clickAndDragFormatIssueBySignature.clear();
+}
+
+function getClickAndDragFormatRetryCount(signature = "") {
+  const normalizedSignature = normalizeQuizText(signature);
+  if (!normalizedSignature) return 0;
+  return clickAndDragFormatRetryAttemptsBySignature.get(normalizedSignature) || 0;
+}
+
+function incrementClickAndDragFormatRetryCount(signature = "") {
+  const normalizedSignature = normalizeQuizText(signature);
+  if (!normalizedSignature) return 0;
+  const nextCount = getClickAndDragFormatRetryCount(normalizedSignature) + 1;
+  clickAndDragFormatRetryAttemptsBySignature.set(normalizedSignature, nextCount);
+  return nextCount;
 }
 
 function waitForCondition(
@@ -375,6 +405,19 @@ function resolveMultipleChoiceAnswerOption(answer, optionModels) {
   return null;
 }
 
+function normalizeClickAndDragComparableText(text) {
+  return normalizeQuizText(text)
+    .replace(/[’‘]/g, "'")
+    .replace(/[“”]/g, '"');
+}
+
+function normalizeClickAndDragQuoteOmissionComparableText(text) {
+  return normalizeClickAndDragComparableText(text)
+    .replace(/"[^"]*"/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function getClickAndDragIframeElement() {
   return document.querySelector(CLICK_AND_DRAG_IFRAME_SELECTOR);
 }
@@ -388,6 +431,39 @@ function getClickAndDragDocument() {
   } catch (error) {
     return null;
   }
+}
+
+function isClickAndDragIframeStillLoading(doc = getClickAndDragDocument()) {
+  const iframe = getClickAndDragIframeElement();
+  if (!iframe) return false;
+
+  const externalSpinner = document.querySelector("#goReactSpinner");
+  if (externalSpinner && isElementLikelyVisible(externalSpinner)) {
+    return true;
+  }
+
+  if (!doc) return true;
+
+  const readyState = String(doc.readyState || "").toLowerCase();
+  if (readyState === "loading" || readyState === "uninitialized") {
+    return true;
+  }
+
+  const iframeLoader = doc.querySelector("#loader, .ahe-ui-loading-spinner");
+  if (iframeLoader && isElementLikelyVisible(iframeLoader)) {
+    return true;
+  }
+
+  const hasDropzones = Boolean(doc.querySelector(".drop-zone[dropzoneid]"));
+  const hasLabels = Boolean(doc.querySelector(".label-box[labelid]"));
+  return !(hasDropzones && hasLabels);
+}
+
+function isClickAndDragQuestionPendingLoad(snapshot = getQuizStateSnapshot()) {
+  return (
+    snapshot?.questionType === "click_and_drag" &&
+    isClickAndDragIframeStillLoading()
+  );
 }
 
 function getClickAndDragQuestionText() {
@@ -406,7 +482,7 @@ function getClickAndDragQuestionText() {
 }
 
 function normalizeClickAndDragCategoryText(text) {
-  return normalizeQuizText(text).replace(
+  return normalizeClickAndDragComparableText(text).replace(
     CLICK_AND_DRAG_CATEGORY_COUNT_SUFFIX_REGEX,
     ""
   );
@@ -491,8 +567,11 @@ function getClickAndDragCategoryModels(doc = getClickAndDragDocument()) {
     categories.push({
       index: categories.length,
       categoryText,
-      normalizedText: normalizeQuizText(categoryText),
-      normalizedLower: normalizeQuizText(categoryText).toLowerCase(),
+      normalizedText: normalizeClickAndDragComparableText(categoryText),
+      normalizedLower: normalizeClickAndDragComparableText(categoryText).toLowerCase(),
+      normalizedQuoteOmission: normalizeClickAndDragQuoteOmissionComparableText(
+        categoryText
+      ),
       dropzoneId,
     });
   });
@@ -520,8 +599,11 @@ function getClickAndDragCategoryModels(doc = getClickAndDragDocument()) {
     categories.push({
       index: categories.length,
       categoryText,
-      normalizedText: normalizeQuizText(categoryText),
-      normalizedLower: normalizeQuizText(categoryText).toLowerCase(),
+      normalizedText: normalizeClickAndDragComparableText(categoryText),
+      normalizedLower: normalizeClickAndDragComparableText(categoryText).toLowerCase(),
+      normalizedQuoteOmission: normalizeClickAndDragQuoteOmissionComparableText(
+        categoryText
+      ),
       dropzoneId,
     });
   }
@@ -557,8 +639,11 @@ function getClickAndDragLabelModels(doc = getClickAndDragDocument()) {
       index: labels.length,
       labelId,
       labelText,
-      normalizedText: normalizeQuizText(labelText),
-      normalizedLower: normalizeQuizText(labelText).toLowerCase(),
+      normalizedText: normalizeClickAndDragComparableText(labelText),
+      normalizedLower: normalizeClickAndDragComparableText(labelText).toLowerCase(),
+      normalizedQuoteOmission: normalizeClickAndDragQuoteOmissionComparableText(
+        labelText
+      ),
       dropzoneId,
       isInPool: Boolean(labelNode.closest("#label-list")),
     });
@@ -676,6 +761,19 @@ function collectClickAndDragAnswerEntries(rawAnswer, output) {
         const nextEntry = rawAnswer[index + 1];
         if (typeof nextEntry === "string") {
           const parsedNext = parseClickAndDragPairString(nextEntry);
+          if (parsedNext?.labelRef && parsedNext.categoryRef) {
+            const mergedLabel = normalizeQuizText(
+              `${normalizedEntry} ${parsedNext.labelRef}`
+            );
+            output.push({
+              labelRef: mergedLabel,
+              categoryRef: parsedNext.categoryRef,
+              raw: `${mergedLabel} -> ${parsedNext.categoryRef}`,
+            });
+            index += 1;
+            continue;
+          }
+
           if (parsedNext && !parsedNext.labelRef && parsedNext.categoryRef) {
             output.push({
               labelRef: normalizedEntry,
@@ -763,6 +861,17 @@ function collectClickAndDragAnswerEntries(rawAnswer, output) {
 
       if (!parsed) {
         const parsedNext = parseClickAndDragPairString(segments[index + 1] || "");
+        if (parsedNext?.labelRef && parsedNext.categoryRef) {
+          const mergedLabel = normalizeQuizText(`${segment} ${parsedNext.labelRef}`);
+          output.push({
+            labelRef: mergedLabel,
+            categoryRef: parsedNext.categoryRef,
+            raw: `${mergedLabel} -> ${parsedNext.categoryRef}`,
+          });
+          index += 1;
+          continue;
+        }
+
         if (parsedNext && !parsedNext.labelRef && parsedNext.categoryRef) {
           output.push({
             labelRef: segment,
@@ -795,15 +904,15 @@ function normalizeClickAndDragAnswerEntries(rawAnswer) {
   collectClickAndDragAnswerEntries(rawAnswer, collected);
   return collected
     .map((entry) => ({
-      labelRef: normalizeQuizText(entry.labelRef),
-      categoryRef: normalizeQuizText(entry.categoryRef),
+      labelRef: normalizeClickAndDragComparableText(entry.labelRef),
+      categoryRef: normalizeClickAndDragComparableText(entry.categoryRef),
       raw: normalizeQuizText(entry.raw),
     }))
     .filter((entry) => entry.labelRef && entry.categoryRef);
 }
 
 function parseClickAndDragNumericReference(referenceText, kind, candidateCount) {
-  const normalized = normalizeQuizText(referenceText);
+  const normalized = normalizeClickAndDragComparableText(referenceText);
   if (!normalized || candidateCount <= 0) return -1;
 
   const patterns = [/^#?(\d+)$/];
@@ -828,7 +937,7 @@ function parseClickAndDragNumericReference(referenceText, kind, candidateCount) 
 }
 
 function resolveClickAndDragReference(referenceText, candidates, kind) {
-  const normalizedReference = normalizeQuizText(referenceText);
+  const normalizedReference = normalizeClickAndDragComparableText(referenceText);
   if (!normalizedReference) {
     return {
       status: "unresolved",
@@ -900,6 +1009,55 @@ function resolveClickAndDragReference(referenceText, candidates, kind) {
       reason: "ambiguous_partial",
       candidate: null,
     };
+  }
+
+  const normalizedQuoteOmissionReference =
+    normalizeClickAndDragQuoteOmissionComparableText(normalizedReference);
+  if (normalizedQuoteOmissionReference) {
+    const quoteOmissionExactMatches = candidates.filter((candidate) => {
+      const candidateQuoteOmission =
+        candidate.normalizedQuoteOmission ||
+        normalizeClickAndDragQuoteOmissionComparableText(candidate.normalizedText);
+      return candidateQuoteOmission === normalizedQuoteOmissionReference;
+    });
+    if (quoteOmissionExactMatches.length === 1) {
+      return {
+        status: "resolved",
+        reason: "quote_omission_exact",
+        candidate: quoteOmissionExactMatches[0],
+      };
+    }
+    if (quoteOmissionExactMatches.length > 1) {
+      return {
+        status: "ambiguous",
+        reason: "ambiguous_quote_omission_exact",
+        candidate: null,
+      };
+    }
+
+    const quoteOmissionPartialMatches = candidates.filter((candidate) => {
+      const candidateQuoteOmission =
+        candidate.normalizedQuoteOmission ||
+        normalizeClickAndDragQuoteOmissionComparableText(candidate.normalizedText);
+      return (
+        candidateQuoteOmission.includes(normalizedQuoteOmissionReference) ||
+        normalizedQuoteOmissionReference.includes(candidateQuoteOmission)
+      );
+    });
+    if (quoteOmissionPartialMatches.length === 1) {
+      return {
+        status: "resolved",
+        reason: "quote_omission_partial",
+        candidate: quoteOmissionPartialMatches[0],
+      };
+    }
+    if (quoteOmissionPartialMatches.length > 1) {
+      return {
+        status: "ambiguous",
+        reason: "ambiguous_quote_omission_partial",
+        candidate: null,
+      };
+    }
   }
 
   const numericIndex = parseClickAndDragNumericReference(
@@ -1732,6 +1890,64 @@ function formatClickAndDragManualIssueLines(
   });
 }
 
+function summarizeClickAndDragFormatIssue(formatIssueDetails) {
+  const unresolved = Array.isArray(formatIssueDetails?.unresolved)
+    ? formatIssueDetails.unresolved
+    : [];
+  const conflicts = Array.isArray(formatIssueDetails?.conflicts)
+    ? formatIssueDetails.conflicts
+    : [];
+
+  const unresolvedReasons = unresolved.reduce((acc, entry) => {
+    const labelReason = entry?.labelReason || "unknown";
+    const categoryReason = entry?.categoryReason || "unknown";
+    const key = `${labelReason}|${categoryReason}`;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const examples = [];
+  unresolved.slice(0, 3).forEach((entry) => {
+    examples.push(
+      `${entry?.labelRef || "(label)"} -> ${entry?.categoryRef || "(category)"}`
+    );
+  });
+  conflicts.slice(0, 2).forEach((entry) => {
+    examples.push(
+      `${entry?.labelText || "(label)"} -> ${
+        entry?.requestedCategoryText || "(category)"
+      }`
+    );
+  });
+
+  return {
+    unresolvedCount: unresolved.length,
+    conflictCount: conflicts.length,
+    totalCount: unresolved.length + conflicts.length,
+    unresolvedReasons,
+    examples,
+  };
+}
+
+function buildClickAndDragFormatIssueMessage(formatIssueDetails) {
+  const summary = summarizeClickAndDragFormatIssue(formatIssueDetails);
+  const detailsParts = [
+    `Click-and-drag format issue: ${summary.totalCount} mapping${
+      summary.totalCount === 1 ? "" : "s"
+    } could not be resolved.`,
+    'Return ONLY JSON with "answer" as an array.',
+    'Each array item must be one complete "Label -> Category" pair.',
+    "Use exact label/category text including punctuation and apostrophes.",
+    "Do not split labels across lines/items and do not use numbering or bullets.",
+  ];
+
+  if (summary.examples.length > 0) {
+    detailsParts.push(`Examples that failed: ${summary.examples.join(" | ")}`);
+  }
+
+  return detailsParts.join(" ");
+}
+
 function getClickAndDragPlacementFingerprint() {
   const doc = getClickAndDragDocument();
   if (!doc) return "click_and_drag_unavailable";
@@ -1880,6 +2096,10 @@ function hasLastQuestionCueText() {
 }
 
 function isTerminalFinalQuestionState(snapshot = getQuizStateSnapshot()) {
+  if (isClickAndDragQuestionPendingLoad(snapshot)) {
+    return false;
+  }
+
   return (
     isAtOrPastFinalQuestion(snapshot) &&
     !isNextQuizButtonEnabled() &&
@@ -1888,6 +2108,10 @@ function isTerminalFinalQuestionState(snapshot = getQuizStateSnapshot()) {
 }
 
 function isFinalPositionWithoutEnabledNext(snapshot = getQuizStateSnapshot()) {
+  if (isClickAndDragQuestionPendingLoad(snapshot)) {
+    return false;
+  }
+
   return isAtOrPastFinalQuestion(snapshot) && !isNextQuizButtonEnabled();
 }
 
@@ -1909,6 +2133,10 @@ function isQuizStateDispatchReady(snapshot) {
 
   if (snapshot.questionType === "click_and_drag") {
     const doc = getClickAndDragDocument();
+    if (isClickAndDragIframeStillLoading(doc)) {
+      return false;
+    }
+
     const labels = extractClickAndDragLabels(doc);
     const categories = extractClickAndDragCategories(doc);
     return labels.length > 0 && categories.length > 0;
@@ -2156,6 +2384,7 @@ function pauseForManualRecovery(context) {
       currentSnapshot.signature &&
       currentSnapshot.signature !== manualRecoveryContext.questionSignature
     ) {
+      clearClickAndDragFormatRetryState(manualRecoveryContext.questionSignature);
       clearManualRecoveryState();
       if (checkForQuizEnd()) {
         stopAutomation("Quiz completed - all questions answered");
@@ -2200,6 +2429,9 @@ function pauseForManualRecovery(context) {
           latestSnapshot.signature &&
           latestSnapshot.signature !== manualRecoveryContext.questionSignature
         ) {
+          clearClickAndDragFormatRetryState(
+            manualRecoveryContext.questionSignature
+          );
           clearManualRecoveryState();
           if (checkForQuizEnd()) {
             stopAutomation("Quiz completed - all questions answered");
@@ -2226,6 +2458,9 @@ function pauseForManualRecovery(context) {
         }
 
         if (transitioned) {
+          if (transitionSnapshot?.signature) {
+            clearClickAndDragFormatRetryState(transitionSnapshot.signature);
+          }
           clearManualRecoveryState();
           scheduleCheckForNextStep(0, "manual_recovery_auto_advanced");
           return;
@@ -2316,6 +2551,9 @@ function isLikelyQuizCompletedState() {
   }
 
   const snapshot = getQuizStateSnapshot();
+  if (isClickAndDragQuestionPendingLoad(snapshot)) {
+    return false;
+  }
 
   if (
     Number.isInteger(snapshot.progressCurrent) &&
@@ -2369,6 +2607,7 @@ function checkForQuizEnd() {
 function stopAutomation(reason = "Quiz completed") {
   isAutomating = false;
   clearManualRecoveryState();
+  clearClickAndDragFormatRetryState();
   pendingQuestionId = null;
   pendingAdvancePerf = null;
   lastDispatchedQuestionSignature = "";
@@ -2426,6 +2665,15 @@ function checkForNextStep(trigger = "direct") {
 
     const snapshot = getQuizStateSnapshot();
     if (!isQuizStateDispatchReady(snapshot)) {
+      if (isClickAndDragQuestionPendingLoad(snapshot)) {
+        consecutiveDispatchReadinessMisses = 0;
+        scheduleCheckForNextStep(
+          NEXT_STEP_RETRY_DELAY_MS,
+          "click_and_drag_iframe_loading_retry"
+        );
+        return;
+      }
+
       consecutiveDispatchReadinessMisses += 1;
       if (consecutiveDispatchReadinessMisses >= 50) {
         stopAutomation("No stable question state found");
@@ -2452,7 +2700,7 @@ function checkForNextStep(trigger = "direct") {
       return;
     }
 
-    const questionData = parseQuestion();
+    const questionData = parseQuestion(snapshot);
     if (questionData) {
       consecutiveDispatchReadinessMisses = 0;
 
@@ -2557,8 +2805,8 @@ function checkForNextStep(trigger = "direct") {
   }
 }
 
-function parseQuestion() {
-  const questionType = getQuizQuestionType();
+function parseQuestion(snapshot = getQuizStateSnapshot()) {
+  const questionType = snapshot?.questionType || getQuizQuestionType();
   if (!questionType) {
     console.log("Unknown question type");
     return null;
@@ -2582,10 +2830,17 @@ function parseQuestion() {
     return null;
   }
 
+  const questionSignature = snapshot?.signature || "";
+  const previousFormatIssue =
+    questionType === "click_and_drag" && questionSignature
+      ? clickAndDragFormatIssueBySignature.get(questionSignature) || null
+      : null;
+
   return {
     type: questionType,
     question: questionText,
     options: options,
+    previousFormatIssue,
     previousCorrection: lastIncorrectQuestion
       ? {
           question: lastIncorrectQuestion,
@@ -2632,9 +2887,57 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
     let answerApplication = await applyQuizAnswer(answer);
 
     if (!answerApplication.applied) {
-      console.warn(LOG_PREFIX, "Unable to apply answer; refusing to advance", answer);
+      const failureSnapshot = getQuizStateSnapshot();
+      const failureSignature = failureSnapshot.signature || "";
+      const isClickAndDragFormatIssue =
+        answerApplication.type === "click_and_drag" &&
+        answerApplication.retryableFormatIssue;
+
+      if (isClickAndDragFormatIssue) {
+        const formatIssueSummary = summarizeClickAndDragFormatIssue(
+          answerApplication.formatIssueDetails
+        );
+        const retryCount = getClickAndDragFormatRetryCount(failureSignature);
+        const canRetry =
+          Boolean(failureSignature) &&
+          retryCount < CLICK_AND_DRAG_FORMAT_RETRY_LIMIT;
+
+        console.warn(LOG_PREFIX, "Click-and-drag format issue detected", {
+          questionSignature: failureSignature || "(missing_signature)",
+          retryCount,
+          retryLimit: CLICK_AND_DRAG_FORMAT_RETRY_LIMIT,
+          unresolvedCount: formatIssueSummary.unresolvedCount,
+          conflictCount: formatIssueSummary.conflictCount,
+          unresolvedReasons: formatIssueSummary.unresolvedReasons,
+          examples: formatIssueSummary.examples,
+          canRetry,
+        });
+
+        if (isAutomating && canRetry) {
+          clickAndDragFormatIssueBySignature.set(
+            failureSignature,
+            buildClickAndDragFormatIssueMessage(answerApplication.formatIssueDetails)
+          );
+          const nextRetryCount =
+            incrementClickAndDragFormatRetryCount(failureSignature);
+          lastDispatchedAt = 0;
+          scheduleCheckForNextStep(0, "click_and_drag_format_retry");
+          console.warn(LOG_PREFIX, "Retrying click-and-drag format issue", {
+            questionSignature: failureSignature,
+            retryCount: nextRetryCount,
+            retryLimit: CLICK_AND_DRAG_FORMAT_RETRY_LIMIT,
+          });
+          return;
+        }
+      }
+
+      console.warn(LOG_PREFIX, "Unable to apply answer; refusing to advance", {
+        answer,
+        type: answerApplication.type || "unknown",
+        retryableFormatIssue: Boolean(answerApplication.retryableFormatIssue),
+      });
+
       if (isAutomating) {
-        const failureSnapshot = getQuizStateSnapshot();
         const manualRecoveryAnswer =
           answerApplication.manualRecoveryAnswer !== undefined
             ? answerApplication.manualRecoveryAnswer
@@ -2798,7 +3101,13 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
           };
         }
 
-        await waitForQuizTransition(previousSnapshot, QUIZ_TRANSITION_TIMEOUT_MS);
+        const transitioned = await waitForQuizTransition(
+          previousSnapshot,
+          QUIZ_TRANSITION_TIMEOUT_MS
+        );
+        if (transitioned && previousSnapshot.signature) {
+          clearClickAndDragFormatRetryState(previousSnapshot.signature);
+        }
 
         if (checkForQuizEnd()) {
           stopAutomation("Quiz completed - all questions answered");
@@ -3032,14 +3341,28 @@ function handleFillInTheBlankAnswer(answer) {
 }
 
 async function handleClickAndDragAnswer(answer) {
-  const doc = getClickAndDragDocument();
-  if (!doc) {
+  let doc = getClickAndDragDocument();
+
+  if (isClickAndDragIframeStillLoading(doc)) {
+    try {
+      doc = await waitForCondition(() => {
+        const nextDoc = getClickAndDragDocument();
+        if (!nextDoc) return null;
+        return isClickAndDragIframeStillLoading(nextDoc) ? null : nextDoc;
+      }, CLICK_AND_DRAG_IFRAME_READY_TIMEOUT_MS);
+    } catch (error) {
+      doc = getClickAndDragDocument();
+    }
+  }
+
+  if (!doc || isClickAndDragIframeStillLoading(doc)) {
     return {
       applied: false,
       type: "click_and_drag",
       verify: () => false,
+      retryableFormatIssue: false,
       manualRecoveryReason:
-        "Click-and-drag tool was not available. Paused to avoid skipping.",
+        "Click-and-drag iframe is still loading. Paused to avoid skipping.",
       manualRecoveryAnswer: answer,
       manualRecoveryPreFingerprint: getAnswerCommitFingerprint(),
     };
@@ -3064,6 +3387,11 @@ async function handleClickAndDragAnswer(answer) {
       applied: false,
       type: "click_and_drag",
       verify,
+      retryableFormatIssue: true,
+      formatIssueDetails: {
+        unresolved: [],
+        conflicts: [],
+      },
       manualRecoveryReason:
         "AI response did not contain usable 'Label -> Category' mappings. Paused to avoid skipping.",
       manualRecoveryAnswer: answer,
@@ -3076,6 +3404,7 @@ async function handleClickAndDragAnswer(answer) {
       applied: false,
       type: "click_and_drag",
       verify,
+      retryableFormatIssue: false,
       manualRecoveryReason:
         "Click-and-drag labels or categories were not ready. Paused to avoid skipping.",
       manualRecoveryAnswer: answer,
@@ -3103,6 +3432,8 @@ async function handleClickAndDragAnswer(answer) {
     moveResult.unresolvedMoves.length +
     targetPlan.unresolved.length +
     targetPlan.conflicts.length;
+  const hasFormatMappingIssues =
+    targetPlan.unresolved.length > 0 || targetPlan.conflicts.length > 0;
   const alignedCount = countClickAndDragAlignedMoves(
     targetPlan.resolvedMoves,
     getClickAndDragDocument()
@@ -3149,6 +3480,11 @@ async function handleClickAndDragAnswer(answer) {
     applied: false,
     type: "click_and_drag",
     verify,
+    retryableFormatIssue: hasFormatMappingIssues,
+    formatIssueDetails: {
+      unresolved: targetPlan.unresolved,
+      conflicts: targetPlan.conflicts,
+    },
     manualRecoveryReason: reasonParts.join(" "),
     manualRecoveryAnswer: issueLines.length > 0 ? issueLines : answer,
     manualRecoveryPreFingerprint: getAnswerCommitFingerprint(),
@@ -3240,6 +3576,7 @@ function addAssistantButton() {
         );
         if (proceed) {
           isAutomating = true;
+          clearClickAndDragFormatRetryState();
           pendingQuestionId = null;
           pendingAdvancePerf = null;
           lastDispatchedQuestionSignature = "";

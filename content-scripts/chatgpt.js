@@ -145,7 +145,7 @@ async function insertQuestion(questionData) {
         categories.map((category, i) => `${i + 1}. ${category}`).join("\n");
     }
     text +=
-      '\n\nThis is a click-and-drag labeling question. Set "answer" to an array of strings using the exact format "Label -> Category". Use exact label and category text, include each label exactly once, and do not include any labels or categories not listed.';
+      '\n\nThis is a click-and-drag labeling question. Set "answer" to an array of strings where each array item is exactly one complete "Label -> Category" pair. Use exact label and category text including punctuation and apostrophes. Do not split a label across lines or array items. Do not include numbering, bullets, prefixes, or extra commentary. Include each label exactly once, and do not include labels or categories not listed.';
   } else if (options && options.length > 0) {
     text +=
       "\nOptions:\n" + options.map((opt, i) => `${i + 1}. ${opt}`).join("\n");
