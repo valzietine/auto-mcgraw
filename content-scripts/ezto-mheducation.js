@@ -36,6 +36,8 @@ let manualRecoveryContext = null;
 const CLICK_AND_DRAG_IFRAME_SELECTOR =
   "iframe.external[src*='clickanddrag'], iframe.external[src*='/ext/common/clickanddrag/'], iframe[title*='Assessment Tool'][src*='clickanddrag']";
 const CLICK_AND_DRAG_CATEGORY_COUNT_SUFFIX_REGEX = /\s*\(\d+\s*\/\s*\d+\)\s*$/;
+const CLICK_AND_DRAG_MOVE_MAX_PASSES = 3;
+const CLICK_AND_DRAG_MOVE_MAX_KEYBOARD_STEPS = 8;
 
 function createQuestionId() {
   questionSequence += 1;
@@ -200,10 +202,128 @@ function normalizeClickAndDragCategoryText(text) {
   );
 }
 
-function extractClickAndDragLabels(doc = getClickAndDragDocument()) {
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function createKeyboardEvent(
+  type,
+  key,
+  code,
+  keyCode,
+  doc = document
+) {
+  const view = doc?.defaultView || window;
+
+  let event = null;
+  try {
+    event = new view.KeyboardEvent(type, {
+      key,
+      code,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      keyCode,
+      which: keyCode,
+      charCode: keyCode,
+    });
+  } catch (error) {
+    event = new view.Event(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    });
+  }
+
+  try {
+    Object.defineProperty(event, "key", { get: () => key });
+    Object.defineProperty(event, "code", { get: () => code });
+    Object.defineProperty(event, "keyCode", { get: () => keyCode });
+    Object.defineProperty(event, "which", { get: () => keyCode });
+    Object.defineProperty(event, "charCode", { get: () => keyCode });
+  } catch (error) {}
+
+  return event;
+}
+
+function dispatchKeyboardSequence(
+  target,
+  key,
+  code,
+  keyCode,
+  doc = target?.ownerDocument || document
+) {
+  if (!target) return;
+  target.dispatchEvent(createKeyboardEvent("keydown", key, code, keyCode, doc));
+  target.dispatchEvent(createKeyboardEvent("keypress", key, code, keyCode, doc));
+  target.dispatchEvent(createKeyboardEvent("keyup", key, code, keyCode, doc));
+}
+
+function getClickAndDragCategoryModels(doc = getClickAndDragDocument()) {
   if (!doc) return [];
 
-  const labelsById = new Map();
+  const categories = [];
+  const groups = Array.from(
+    doc.querySelectorAll("#js-groupActivityContainer .groups")
+  );
+
+  groups.forEach((groupNode) => {
+    const categoryText = normalizeClickAndDragCategoryText(
+      groupNode.querySelector("h3")?.textContent || ""
+    );
+    const dropzoneNode = groupNode.querySelector(".drop-zone[dropzoneid]");
+    const dropzoneId =
+      dropzoneNode?.getAttribute("dropzoneid") || dropzoneNode?.id || "";
+
+    if (!categoryText || !dropzoneId) return;
+    if (categories.some((category) => category.dropzoneId === dropzoneId)) return;
+
+    categories.push({
+      index: categories.length,
+      categoryText,
+      normalizedText: normalizeQuizText(categoryText),
+      normalizedLower: normalizeQuizText(categoryText).toLowerCase(),
+      dropzoneId,
+    });
+  });
+
+  if (categories.length > 0) {
+    return categories;
+  }
+
+  const fallbackTitles = Array.from(
+    doc.querySelectorAll("#js-groupActivityContainer .groups h3")
+  )
+    .map((node) => normalizeClickAndDragCategoryText(node.textContent))
+    .filter(Boolean);
+  const fallbackDropzones = Array.from(doc.querySelectorAll(".drop-zone[dropzoneid]"));
+  const fallbackCount = Math.min(fallbackTitles.length, fallbackDropzones.length);
+
+  for (let index = 0; index < fallbackCount; index += 1) {
+    const dropzoneNode = fallbackDropzones[index];
+    const dropzoneId =
+      dropzoneNode?.getAttribute("dropzoneid") || dropzoneNode?.id || "";
+    if (!dropzoneId) continue;
+    if (categories.some((category) => category.dropzoneId === dropzoneId)) continue;
+
+    const categoryText = fallbackTitles[index];
+    categories.push({
+      index: categories.length,
+      categoryText,
+      normalizedText: normalizeQuizText(categoryText),
+      normalizedLower: normalizeQuizText(categoryText).toLowerCase(),
+      dropzoneId,
+    });
+  }
+
+  return categories;
+}
+
+function getClickAndDragLabelModels(doc = getClickAndDragDocument()) {
+  if (!doc) return [];
+
+  const labels = [];
+  const seenLabelIds = new Set();
   const labelNodes = Array.from(doc.querySelectorAll(".label-box[labelid]"));
 
   labelNodes.forEach((labelNode) => {
@@ -212,29 +332,1194 @@ function extractClickAndDragLabels(doc = getClickAndDragDocument()) {
       labelNode.getAttribute("id") ||
       labelNode.id ||
       "";
+    if (!labelId || seenLabelIds.has(labelId)) return;
+
     const labelText = normalizeQuizText(
       labelNode.querySelector(".label-text")?.textContent || labelNode.textContent
     );
-
     if (!labelText) return;
-    if (labelId && labelsById.has(labelId)) return;
 
-    labelsById.set(labelId || `${labelsById.size}_${labelText}`, labelText);
+    const dropzoneNode = labelNode.closest(".drop-zone[dropzoneid]");
+    const dropzoneId =
+      dropzoneNode?.getAttribute("dropzoneid") || dropzoneNode?.id || "";
+
+    labels.push({
+      index: labels.length,
+      labelId,
+      labelText,
+      normalizedText: normalizeQuizText(labelText),
+      normalizedLower: normalizeQuizText(labelText).toLowerCase(),
+      dropzoneId,
+      isInPool: Boolean(labelNode.closest("#label-list")),
+    });
+
+    seenLabelIds.add(labelId);
   });
 
-  return Array.from(labelsById.values());
+  return labels;
+}
+
+function extractClickAndDragLabels(doc = getClickAndDragDocument()) {
+  return getClickAndDragLabelModels(doc).map((label) => label.labelText);
 }
 
 function extractClickAndDragCategories(doc = getClickAndDragDocument()) {
-  if (!doc) return [];
+  return getClickAndDragCategoryModels(doc).map((category) => category.categoryText);
+}
 
-  const categories = Array.from(
-    doc.querySelectorAll("#js-groupActivityContainer .groups h3")
-  )
-    .map((node) => normalizeClickAndDragCategoryText(node.textContent))
+function tryParseClickAndDragAnswerArrayString(value) {
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch (error) {}
+
+  const entries = [];
+  const itemRegex = /"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'/g;
+  let match = null;
+  while ((match = itemRegex.exec(trimmed)) !== null) {
+    const raw = match[1] !== undefined ? match[1] : match[2];
+    const normalized = normalizeQuizText(raw.replace(/\\"/g, '"'));
+    if (normalized) {
+      entries.push(normalized);
+    }
+  }
+
+  return entries.length > 0 ? entries : null;
+}
+
+function splitClickAndDragAnswerSegments(value) {
+  if (typeof value !== "string") return [];
+
+  return value
+    .split(/\n|;/)
+    .map((segment) =>
+      segment
+        .trim()
+        .replace(/^[-*•]\s+/, "")
+        .replace(/^["'`]|["'`]$/g, "")
+        .replace(/^\d+[\.)]\s+/, "")
+        .trim()
+    )
     .filter(Boolean);
+}
 
-  return Array.from(new Set(categories));
+function parseClickAndDragPairString(value) {
+  if (typeof value !== "string") return null;
+
+  const cleaned = value
+    .trim()
+    .replace(/^[-*•]\s+/, "")
+    .replace(/^["'`]|["'`]$/g, "")
+    .replace(/^\d+[\.)]\s+/, "")
+    .trim();
+  if (!cleaned) return null;
+
+  const arrowMatch = cleaned.match(/^(.*?)\s*(?:->|=>)\s*(.+)$/);
+  if (arrowMatch) {
+    return {
+      labelRef: arrowMatch[1].trim(),
+      categoryRef: arrowMatch[2].trim(),
+      raw: cleaned,
+    };
+  }
+
+  const colonMatch = cleaned.match(/^(.*?)\s*:\s*(.+)$/);
+  if (colonMatch) {
+    return {
+      labelRef: colonMatch[1].trim(),
+      categoryRef: colonMatch[2].trim(),
+      raw: cleaned,
+    };
+  }
+
+  return null;
+}
+
+function collectClickAndDragAnswerEntries(rawAnswer, output) {
+  if (!output || rawAnswer === null || rawAnswer === undefined) return;
+
+  if (Array.isArray(rawAnswer)) {
+    for (let index = 0; index < rawAnswer.length; index += 1) {
+      const entry = rawAnswer[index];
+      if (typeof entry !== "string") {
+        collectClickAndDragAnswerEntries(entry, output);
+        continue;
+      }
+
+      const normalizedEntry = normalizeQuizText(entry);
+      if (!normalizedEntry) continue;
+
+      const parsed = parseClickAndDragPairString(normalizedEntry);
+      if (parsed?.labelRef && parsed?.categoryRef) {
+        output.push(parsed);
+        continue;
+      }
+
+      if (!parsed) {
+        const nextEntry = rawAnswer[index + 1];
+        if (typeof nextEntry === "string") {
+          const parsedNext = parseClickAndDragPairString(nextEntry);
+          if (parsedNext && !parsedNext.labelRef && parsedNext.categoryRef) {
+            output.push({
+              labelRef: normalizedEntry,
+              categoryRef: parsedNext.categoryRef,
+              raw: `${normalizedEntry} -> ${parsedNext.categoryRef}`,
+            });
+            index += 1;
+            continue;
+          }
+        }
+      }
+
+      if (parsed && parsed.labelRef && !parsed.categoryRef) {
+        const nextEntry = rawAnswer[index + 1];
+        if (typeof nextEntry === "string") {
+          const normalizedNext = normalizeQuizText(nextEntry);
+          if (normalizedNext && !parseClickAndDragPairString(normalizedNext)) {
+            output.push({
+              labelRef: parsed.labelRef,
+              categoryRef: normalizedNext,
+              raw: `${parsed.labelRef} -> ${normalizedNext}`,
+            });
+            index += 1;
+          }
+        }
+      }
+    }
+    return;
+  }
+
+  if (typeof rawAnswer === "object") {
+    const labelCandidate =
+      rawAnswer.label ??
+      rawAnswer.left ??
+      rawAnswer.prompt ??
+      rawAnswer.source ??
+      rawAnswer.from ??
+      rawAnswer.key;
+    const categoryCandidate =
+      rawAnswer.category ??
+      rawAnswer.group ??
+      rawAnswer.right ??
+      rawAnswer.target ??
+      rawAnswer.to ??
+      rawAnswer.value ??
+      rawAnswer.answer ??
+      rawAnswer.match ??
+      rawAnswer.choice;
+
+    if (labelCandidate !== undefined && categoryCandidate !== undefined) {
+      output.push({
+        labelRef: String(labelCandidate),
+        categoryRef: String(categoryCandidate),
+        raw: `${String(labelCandidate)} -> ${String(categoryCandidate)}`,
+      });
+      return;
+    }
+
+    Object.entries(rawAnswer).forEach(([labelRef, categoryRef]) => {
+      output.push({
+        labelRef: String(labelRef),
+        categoryRef: String(categoryRef),
+        raw: `${String(labelRef)} -> ${String(categoryRef)}`,
+      });
+    });
+    return;
+  }
+
+  if (typeof rawAnswer === "string") {
+    const parsedArray = tryParseClickAndDragAnswerArrayString(rawAnswer);
+    if (parsedArray) {
+      collectClickAndDragAnswerEntries(parsedArray, output);
+      return;
+    }
+
+    const segments = splitClickAndDragAnswerSegments(rawAnswer);
+    for (let index = 0; index < segments.length; index += 1) {
+      const segment = segments[index];
+      const parsed = parseClickAndDragPairString(segment);
+
+      if (parsed?.labelRef && parsed?.categoryRef) {
+        output.push(parsed);
+        continue;
+      }
+
+      if (!parsed) {
+        const parsedNext = parseClickAndDragPairString(segments[index + 1] || "");
+        if (parsedNext && !parsedNext.labelRef && parsedNext.categoryRef) {
+          output.push({
+            labelRef: segment,
+            categoryRef: parsedNext.categoryRef,
+            raw: `${segment} -> ${parsedNext.categoryRef}`,
+          });
+          index += 1;
+          continue;
+        }
+      }
+
+      if (parsed && parsed.labelRef && !parsed.categoryRef) {
+        const nextSegment = segments[index + 1];
+        if (nextSegment && !parseClickAndDragPairString(nextSegment)) {
+          output.push({
+            labelRef: parsed.labelRef,
+            categoryRef: nextSegment,
+            raw: `${parsed.labelRef} -> ${nextSegment}`,
+          });
+          index += 1;
+        }
+      }
+    }
+    return;
+  }
+}
+
+function normalizeClickAndDragAnswerEntries(rawAnswer) {
+  const collected = [];
+  collectClickAndDragAnswerEntries(rawAnswer, collected);
+  return collected
+    .map((entry) => ({
+      labelRef: normalizeQuizText(entry.labelRef),
+      categoryRef: normalizeQuizText(entry.categoryRef),
+      raw: normalizeQuizText(entry.raw),
+    }))
+    .filter((entry) => entry.labelRef && entry.categoryRef);
+}
+
+function parseClickAndDragNumericReference(referenceText, kind, candidateCount) {
+  const normalized = normalizeQuizText(referenceText);
+  if (!normalized || candidateCount <= 0) return -1;
+
+  const patterns = [/^#?(\d+)$/];
+  if (kind === "label") {
+    patterns.push(/^(?:label|item)\s*#?\s*(\d+)$/i);
+  } else {
+    patterns.push(/^(?:category|group)\s*#?\s*(\d+)$/i);
+    patterns.push(/^drop\s*zone\s*#?\s*(\d+)$/i);
+  }
+
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    if (!match) continue;
+
+    const index = Number(match[1]) - 1;
+    if (Number.isInteger(index) && index >= 0 && index < candidateCount) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function resolveClickAndDragReference(referenceText, candidates, kind) {
+  const normalizedReference = normalizeQuizText(referenceText);
+  if (!normalizedReference) {
+    return {
+      status: "unresolved",
+      reason: "empty_reference",
+      candidate: null,
+    };
+  }
+
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    return {
+      status: "unresolved",
+      reason: "no_candidates",
+      candidate: null,
+    };
+  }
+
+  const exactMatches = candidates.filter(
+    (candidate) => candidate.normalizedText === normalizedReference
+  );
+  if (exactMatches.length === 1) {
+    return {
+      status: "resolved",
+      reason: "exact",
+      candidate: exactMatches[0],
+    };
+  }
+  if (exactMatches.length > 1) {
+    return {
+      status: "ambiguous",
+      reason: "ambiguous_exact",
+      candidate: null,
+    };
+  }
+
+  const normalizedLower = normalizedReference.toLowerCase();
+  const caseInsensitiveMatches = candidates.filter(
+    (candidate) => candidate.normalizedLower === normalizedLower
+  );
+  if (caseInsensitiveMatches.length === 1) {
+    return {
+      status: "resolved",
+      reason: "case_insensitive_exact",
+      candidate: caseInsensitiveMatches[0],
+    };
+  }
+  if (caseInsensitiveMatches.length > 1) {
+    return {
+      status: "ambiguous",
+      reason: "ambiguous_case_insensitive_exact",
+      candidate: null,
+    };
+  }
+
+  const partialMatches = candidates.filter(
+    (candidate) =>
+      candidate.normalizedLower.includes(normalizedLower) ||
+      normalizedLower.includes(candidate.normalizedLower)
+  );
+  if (partialMatches.length === 1) {
+    return {
+      status: "resolved",
+      reason: "unique_partial",
+      candidate: partialMatches[0],
+    };
+  }
+  if (partialMatches.length > 1) {
+    return {
+      status: "ambiguous",
+      reason: "ambiguous_partial",
+      candidate: null,
+    };
+  }
+
+  const numericIndex = parseClickAndDragNumericReference(
+    normalizedReference,
+    kind,
+    candidates.length
+  );
+  if (numericIndex >= 0) {
+    return {
+      status: "resolved",
+      reason: "numeric",
+      candidate: candidates[numericIndex],
+    };
+  }
+
+  return {
+    status: "unresolved",
+    reason: "no_match",
+    candidate: null,
+  };
+}
+
+function normalizeClickAndDragTargets(rawAnswer, doc = getClickAndDragDocument()) {
+  const labelCandidates = getClickAndDragLabelModels(doc);
+  const categoryCandidates = getClickAndDragCategoryModels(doc);
+  const entries = normalizeClickAndDragAnswerEntries(rawAnswer);
+
+  const resolvedMoves = [];
+  const unresolved = [];
+  const conflicts = [];
+  const duplicates = [];
+  const assignmentsByLabelId = new Map();
+  const mentionedLabelIds = new Set();
+
+  if (!labelCandidates.length || !categoryCandidates.length || !entries.length) {
+    return {
+      resolvedMoves,
+      unresolved,
+      conflicts,
+      duplicates,
+      entries,
+      labelCandidates,
+      categoryCandidates,
+    };
+  }
+
+  entries.forEach((entry) => {
+    const labelResolution = resolveClickAndDragReference(
+      entry.labelRef,
+      labelCandidates,
+      "label"
+    );
+    const categoryResolution = resolveClickAndDragReference(
+      entry.categoryRef,
+      categoryCandidates,
+      "category"
+    );
+    if (labelResolution.status === "resolved" && labelResolution.candidate?.labelId) {
+      mentionedLabelIds.add(labelResolution.candidate.labelId);
+    }
+
+    if (labelResolution.status !== "resolved" || categoryResolution.status !== "resolved") {
+      unresolved.push({
+        raw: entry.raw,
+        labelRef: entry.labelRef,
+        categoryRef: entry.categoryRef,
+        labelReason: labelResolution.reason,
+        categoryReason: categoryResolution.reason,
+      });
+      return;
+    }
+
+    const labelCandidate = labelResolution.candidate;
+    const categoryCandidate = categoryResolution.candidate;
+    const existing = assignmentsByLabelId.get(labelCandidate.labelId);
+
+    if (existing) {
+      if (existing.targetDropzoneId === categoryCandidate.dropzoneId) {
+        duplicates.push({
+          labelId: labelCandidate.labelId,
+          labelText: labelCandidate.labelText,
+          categoryText: categoryCandidate.categoryText,
+          raw: entry.raw,
+        });
+        return;
+      }
+
+      conflicts.push({
+        labelId: labelCandidate.labelId,
+        labelText: labelCandidate.labelText,
+        existingCategoryText: existing.categoryText,
+        requestedCategoryText: categoryCandidate.categoryText,
+        raw: entry.raw,
+      });
+      return;
+    }
+
+    const move = {
+      labelId: labelCandidate.labelId,
+      labelText: labelCandidate.labelText,
+      targetDropzoneId: categoryCandidate.dropzoneId,
+      categoryText: categoryCandidate.categoryText,
+    };
+
+    assignmentsByLabelId.set(labelCandidate.labelId, move);
+    resolvedMoves.push(move);
+  });
+
+  // EZTO click-and-drag expects every label to be placed; flag omissions explicitly.
+  labelCandidates.forEach((labelCandidate) => {
+    if (mentionedLabelIds.has(labelCandidate.labelId)) return;
+    unresolved.push({
+      raw: `Missing mapping for label: ${labelCandidate.labelText}`,
+      labelRef: labelCandidate.labelText,
+      categoryRef: "",
+      labelReason: "missing_mapping",
+      categoryReason: "missing_mapping",
+    });
+  });
+
+  return {
+    resolvedMoves,
+    unresolved,
+    conflicts,
+    duplicates,
+    entries,
+    labelCandidates,
+    categoryCandidates,
+  };
+}
+
+function getClickAndDragLabelNodesById(
+  labelId,
+  doc = getClickAndDragDocument()
+) {
+  if (!doc || !labelId) return [];
+  const escapedLabelId = String(labelId).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return Array.from(doc.querySelectorAll(`.label-box[labelid="${escapedLabelId}"]`));
+}
+
+function isElementLikelyVisible(element) {
+  if (!element) return false;
+  if (element.hidden) return false;
+
+  const ownerDoc = element.ownerDocument || document;
+  const view = ownerDoc.defaultView || window;
+  const style = view.getComputedStyle ? view.getComputedStyle(element) : null;
+
+  if (style) {
+    if (style.display === "none") return false;
+    if (style.visibility === "hidden") return false;
+    if (style.opacity === "0") return false;
+  }
+
+  if (typeof element.getBoundingClientRect === "function") {
+    const rect = element.getBoundingClientRect();
+    if (!rect || (!rect.width && !rect.height)) return false;
+  }
+
+  return true;
+}
+
+function getClickAndDragLabelNodeById(
+  labelId,
+  doc = getClickAndDragDocument()
+) {
+  const candidates = getClickAndDragLabelNodesById(labelId, doc).filter(
+    (node) => node && node.isConnected
+  );
+  if (candidates.length === 0) return null;
+
+  const scored = candidates.map((node) => {
+    let score = 0;
+    if (node.getAttribute("aria-pressed") === "true") score += 8;
+    if (node.closest(".drop-zone[dropzoneid]")) score += 4;
+    if (node.closest("#label-list")) score += 1;
+    if (isElementLikelyVisible(node)) score += 2;
+    if (node.getAttribute("aria-disabled") === "true") score -= 6;
+    return { node, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0]?.node || null;
+}
+
+function getClickAndDragDropzoneById(
+  dropzoneId,
+  doc = getClickAndDragDocument()
+) {
+  if (!doc || !dropzoneId) return null;
+  const escapedDropzoneId = String(dropzoneId)
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"');
+  return doc.querySelector(`.drop-zone[dropzoneid="${escapedDropzoneId}"]`);
+}
+
+function getClickAndDragDropTargetById(
+  dropzoneId,
+  doc = getClickAndDragDocument()
+) {
+  const dropzone = getClickAndDragDropzoneById(dropzoneId, doc);
+  if (!dropzone) return null;
+  return dropzone.querySelector(".single-drop-zone") || dropzone;
+}
+
+function getClickAndDragGroupContainerByDropzoneId(
+  dropzoneId,
+  doc = getClickAndDragDocument()
+) {
+  const dropzone = getClickAndDragDropzoneById(dropzoneId, doc);
+  if (!dropzone) return null;
+  return dropzone.closest(".groups");
+}
+
+function getClickAndDragGroupTitleByDropzoneId(
+  dropzoneId,
+  doc = getClickAndDragDocument()
+) {
+  const group = getClickAndDragGroupContainerByDropzoneId(dropzoneId, doc);
+  if (!group) return null;
+  return group.querySelector("h3");
+}
+
+function getClickAndDragLabelPlacement(
+  labelId,
+  doc = getClickAndDragDocument()
+) {
+  const labelNodes = getClickAndDragLabelNodesById(labelId, doc).filter(
+    (node) => node && node.isConnected
+  );
+  if (labelNodes.length === 0) return "";
+
+  let bestDropzoneId = "";
+  let bestScore = -Infinity;
+
+  labelNodes.forEach((node) => {
+    const dropzoneNode = node.closest(".drop-zone[dropzoneid]");
+    const dropzoneId = dropzoneNode?.getAttribute("dropzoneid") || "";
+    if (!dropzoneId) return;
+
+    let score = 0;
+    if (isElementLikelyVisible(node)) score += 2;
+    if (node.getAttribute("aria-disabled") !== "true") score += 1;
+    if (node.getAttribute("aria-pressed") === "true") score += 1;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestDropzoneId = dropzoneId;
+    }
+  });
+
+  return bestDropzoneId;
+}
+
+function isClickAndDragLabelInDropzone(
+  labelId,
+  dropzoneId,
+  doc = getClickAndDragDocument()
+) {
+  const placedDropzoneId = getClickAndDragLabelPlacement(labelId, doc);
+  return Boolean(
+    placedDropzoneId &&
+      String(placedDropzoneId) === String(dropzoneId || "")
+  );
+}
+
+function countClickAndDragAlignedMoves(
+  moves,
+  doc = getClickAndDragDocument()
+) {
+  if (!Array.isArray(moves) || moves.length === 0) return 0;
+  return moves.filter((move) =>
+    isClickAndDragLabelInDropzone(move.labelId, move.targetDropzoneId, doc)
+  ).length;
+}
+
+function isClickAndDragAligned(moves, doc = getClickAndDragDocument()) {
+  if (!Array.isArray(moves) || moves.length === 0) return false;
+  return (
+    countClickAndDragAlignedMoves(moves, doc) === moves.length
+  );
+}
+
+function getElementCenterPoint(element) {
+  if (!element || typeof element.getBoundingClientRect !== "function") return null;
+  const rect = element.getBoundingClientRect();
+  if (!rect || (!rect.width && !rect.height)) return null;
+  return {
+    clientX: rect.left + rect.width / 2,
+    clientY: rect.top + rect.height / 2,
+  };
+}
+
+function dispatchMouseEvent(target, type, point, buttons = 0, doc = document) {
+  if (!target || !doc) return;
+  const view = doc.defaultView || window;
+
+  let event = null;
+  try {
+    event = new view.MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      clientX: point?.clientX || 0,
+      clientY: point?.clientY || 0,
+      button: buttons ? 0 : 0,
+      buttons,
+      detail: 1,
+      view,
+    });
+  } catch (error) {
+    event = new view.Event(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    });
+  }
+
+  target.dispatchEvent(event);
+}
+
+function dispatchPointerEvent(target, type, point, buttons = 0, doc = document) {
+  if (!target || !doc) return;
+  const view = doc.defaultView || window;
+  if (typeof view.PointerEvent !== "function") return;
+
+  let event = null;
+  try {
+    event = new view.PointerEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      pointerType: "mouse",
+      pointerId: 1,
+      isPrimary: true,
+      clientX: point?.clientX || 0,
+      clientY: point?.clientY || 0,
+      button: buttons ? 0 : 0,
+      buttons,
+    });
+  } catch (error) {
+    return;
+  }
+
+  target.dispatchEvent(event);
+}
+
+function createFallbackDataTransfer() {
+  const store = {};
+  return {
+    dropEffect: "move",
+    effectAllowed: "all",
+    files: [],
+    items: [],
+    types: [],
+    setData(format, data) {
+      store[format] = String(data);
+      if (!this.types.includes(format)) {
+        this.types.push(format);
+      }
+    },
+    getData(format) {
+      return store[format] || "";
+    },
+    clearData(format) {
+      if (format) {
+        delete store[format];
+        this.types = this.types.filter((type) => type !== format);
+        return;
+      }
+
+      Object.keys(store).forEach((key) => delete store[key]);
+      this.types = [];
+    },
+    setDragImage() {},
+  };
+}
+
+function dispatchDragEvent(target, type, dataTransfer, point, doc = document) {
+  if (!target || !doc) return;
+  const view = doc.defaultView || window;
+
+  let event = null;
+  try {
+    event = new view.DragEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      clientX: point?.clientX || 0,
+      clientY: point?.clientY || 0,
+      dataTransfer,
+    });
+  } catch (error) {
+    event = new view.Event(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    });
+    try {
+      Object.defineProperty(event, "dataTransfer", {
+        value: dataTransfer,
+      });
+    } catch (defineError) {}
+  }
+
+  target.dispatchEvent(event);
+}
+
+async function attemptClickAndDragPointerMove(
+  labelId,
+  targetDropzoneId,
+  doc = getClickAndDragDocument()
+) {
+  const labelNode = getClickAndDragLabelNodeById(labelId, doc);
+  const targetDropzone = getClickAndDragDropzoneById(targetDropzoneId, doc);
+  const targetNode = getClickAndDragDropTargetById(targetDropzoneId, doc);
+  if (!labelNode || !targetDropzone || !targetNode) return false;
+
+  const sourcePoint = getElementCenterPoint(labelNode);
+  const targetPoint = getElementCenterPoint(targetNode);
+  if (!sourcePoint || !targetPoint) return false;
+
+  const docTarget = doc.body || doc.documentElement;
+
+  dispatchPointerEvent(labelNode, "pointerover", sourcePoint, 0, doc);
+  dispatchMouseEvent(labelNode, "mouseover", sourcePoint, 0, doc);
+  dispatchPointerEvent(labelNode, "pointermove", sourcePoint, 0, doc);
+  dispatchMouseEvent(labelNode, "mousemove", sourcePoint, 0, doc);
+  dispatchPointerEvent(labelNode, "pointerdown", sourcePoint, 1, doc);
+  dispatchMouseEvent(labelNode, "mousedown", sourcePoint, 1, doc);
+
+  await delay(30);
+
+  const targetHoverNodes = [targetNode, targetDropzone];
+  dispatchPointerEvent(labelNode, "pointermove", targetPoint, 1, doc);
+  dispatchMouseEvent(labelNode, "mousemove", targetPoint, 1, doc);
+  if (docTarget) {
+    dispatchPointerEvent(docTarget, "pointermove", sourcePoint, 1, doc);
+    dispatchMouseEvent(docTarget, "mousemove", sourcePoint, 1, doc);
+    dispatchPointerEvent(docTarget, "pointermove", targetPoint, 1, doc);
+    dispatchMouseEvent(docTarget, "mousemove", targetPoint, 1, doc);
+  }
+  targetHoverNodes.forEach((node) => {
+    dispatchPointerEvent(node, "pointermove", targetPoint, 1, doc);
+    dispatchMouseEvent(node, "mousemove", targetPoint, 1, doc);
+    dispatchPointerEvent(node, "pointerover", targetPoint, 1, doc);
+    dispatchMouseEvent(node, "mouseover", targetPoint, 1, doc);
+    dispatchMouseEvent(node, "dragover", targetPoint, 1, doc);
+  });
+
+  await delay(25);
+
+  const releaseNodes = [targetNode, targetDropzone];
+  releaseNodes.forEach((node) => {
+    dispatchPointerEvent(node, "pointerup", targetPoint, 0, doc);
+    dispatchMouseEvent(node, "mouseup", targetPoint, 0, doc);
+    dispatchMouseEvent(node, "drop", targetPoint, 0, doc);
+  });
+
+  if (docTarget) {
+    dispatchPointerEvent(docTarget, "pointerup", targetPoint, 0, doc);
+    dispatchMouseEvent(docTarget, "mouseup", targetPoint, 0, doc);
+  }
+
+  await delay(140);
+  return isClickAndDragLabelInDropzone(labelId, targetDropzoneId, doc);
+}
+
+async function attemptClickAndDragHtml5Move(
+  labelId,
+  targetDropzoneId,
+  doc = getClickAndDragDocument()
+) {
+  const labelNode = getClickAndDragLabelNodeById(labelId, doc);
+  const targetDropzone = getClickAndDragDropzoneById(targetDropzoneId, doc);
+  const targetNode = getClickAndDragDropTargetById(targetDropzoneId, doc);
+  if (!labelNode || !targetDropzone || !targetNode) return false;
+
+  const view = doc.defaultView || window;
+  const dataTransfer =
+    typeof view.DataTransfer === "function"
+      ? new view.DataTransfer()
+      : createFallbackDataTransfer();
+  const sourcePoint = getElementCenterPoint(labelNode);
+  const targetPoint = getElementCenterPoint(targetNode);
+
+  dataTransfer.setData("text/plain", String(labelId || ""));
+  dispatchDragEvent(labelNode, "dragstart", dataTransfer, sourcePoint, doc);
+  await delay(10);
+
+  [targetNode, targetDropzone].forEach((node) => {
+    dispatchDragEvent(node, "dragenter", dataTransfer, targetPoint, doc);
+    dispatchDragEvent(node, "dragover", dataTransfer, targetPoint, doc);
+  });
+  dispatchDragEvent(targetNode, "drop", dataTransfer, targetPoint, doc);
+  dispatchDragEvent(targetDropzone, "drop", dataTransfer, targetPoint, doc);
+  await delay(10);
+  dispatchDragEvent(labelNode, "dragend", dataTransfer, targetPoint, doc);
+
+  await delay(160);
+  return isClickAndDragLabelInDropzone(labelId, targetDropzoneId, doc);
+}
+
+async function attemptClickAndDragClickMove(
+  labelId,
+  targetDropzoneId,
+  doc = getClickAndDragDocument()
+) {
+  const labelNode = getClickAndDragLabelNodeById(labelId, doc);
+  const targetDropzone = getClickAndDragDropzoneById(targetDropzoneId, doc);
+  const targetNode = getClickAndDragDropTargetById(targetDropzoneId, doc);
+  const targetGroup = getClickAndDragGroupContainerByDropzoneId(targetDropzoneId, doc);
+  const targetTitle = getClickAndDragGroupTitleByDropzoneId(targetDropzoneId, doc);
+  if (!labelNode || !targetDropzone || !targetNode) return false;
+
+  try {
+    labelNode.click();
+  } catch (error) {
+    return false;
+  }
+  dispatchKeyboardSequence(labelNode, " ", "Space", 32);
+  await delay(70);
+
+  const clickTargets = [targetNode, targetDropzone, targetTitle, targetGroup].filter(
+    Boolean
+  );
+  for (const clickTarget of clickTargets) {
+    try {
+      clickTarget.click();
+    } catch (error) {}
+    await delay(60);
+
+    if (isClickAndDragLabelInDropzone(labelId, targetDropzoneId, doc)) {
+      return true;
+    }
+  }
+
+  for (const clickTarget of clickTargets) {
+    const point = getElementCenterPoint(clickTarget);
+    if (!point) continue;
+
+    dispatchMouseEvent(clickTarget, "mousedown", point, 1, doc);
+    dispatchMouseEvent(clickTarget, "mouseup", point, 0, doc);
+    await delay(60);
+
+    if (isClickAndDragLabelInDropzone(labelId, targetDropzoneId, doc)) {
+      return true;
+    }
+  }
+
+  await delay(120);
+
+  return isClickAndDragLabelInDropzone(labelId, targetDropzoneId, doc);
+}
+
+function getFocusedClickAndDragDropzoneId(doc = getClickAndDragDocument()) {
+  if (!doc) return "";
+  const active = doc.activeElement;
+  if (!active || typeof active.closest !== "function") return "";
+
+  const dropzoneNode = active.closest(".drop-zone[dropzoneid], [dropzoneid]");
+  if (!dropzoneNode) return "";
+  return (
+    dropzoneNode.getAttribute("dropzoneid") ||
+    dropzoneNode.id ||
+    ""
+  );
+}
+
+async function attemptClickAndDragKeyboardMove(
+  labelId,
+  targetDropzoneId,
+  liftConfig = { key: " ", code: "Space", keyCode: 32 },
+  doc = getClickAndDragDocument()
+) {
+  const labelNode = getClickAndDragLabelNodeById(labelId, doc);
+  if (!labelNode) return false;
+
+  const categories = getClickAndDragCategoryModels(doc);
+  const targetIndex = categories.findIndex(
+    (category) => category.dropzoneId === targetDropzoneId
+  );
+  if (targetIndex < 0) return false;
+
+  if (typeof labelNode.focus === "function") {
+    try {
+      labelNode.focus({ preventScroll: true });
+    } catch (error) {
+      labelNode.focus();
+    }
+  }
+
+  await delay(35);
+  dispatchKeyboardSequence(labelNode, liftConfig.key, liftConfig.code, liftConfig.keyCode);
+  await delay(80);
+
+  const targetDropzone = getClickAndDragDropzoneById(targetDropzoneId, doc);
+  const targetNode = getClickAndDragDropTargetById(targetDropzoneId, doc);
+  const targetTitle = getClickAndDragGroupTitleByDropzoneId(targetDropzoneId, doc);
+
+  const focusAndCommit = async (node) => {
+    if (!node) return false;
+
+    if (!node.hasAttribute("tabindex")) {
+      node.setAttribute("tabindex", "-1");
+    }
+
+    if (typeof node.focus === "function") {
+      try {
+        node.focus({ preventScroll: true });
+      } catch (error) {
+        node.focus();
+      }
+    }
+
+    await delay(30);
+    dispatchKeyboardSequence(node, "Enter", "Enter", 13);
+    await delay(45);
+    if (isClickAndDragLabelInDropzone(labelId, targetDropzoneId, doc)) return true;
+
+    dispatchKeyboardSequence(node, " ", "Space", 32);
+    await delay(60);
+    return isClickAndDragLabelInDropzone(labelId, targetDropzoneId, doc);
+  };
+
+  if (await focusAndCommit(targetNode)) return true;
+  if (await focusAndCommit(targetDropzone)) return true;
+  if (await focusAndCommit(targetTitle)) return true;
+
+  const focusSearchMoves = [
+    { key: "ArrowDown", code: "ArrowDown", keyCode: 40 },
+    { key: "ArrowUp", code: "ArrowUp", keyCode: 38 },
+    { key: "ArrowRight", code: "ArrowRight", keyCode: 39 },
+    { key: "ArrowLeft", code: "ArrowLeft", keyCode: 37 },
+  ];
+
+  let movedFocusToTarget = false;
+  for (const move of focusSearchMoves) {
+    for (let step = 0; step < CLICK_AND_DRAG_MOVE_MAX_KEYBOARD_STEPS; step += 1) {
+      dispatchKeyboardSequence(labelNode, move.key, move.code, move.keyCode);
+      await delay(45);
+
+      const focusedDropzoneId = getFocusedClickAndDragDropzoneId(doc);
+      if (
+        focusedDropzoneId &&
+        String(focusedDropzoneId) === String(targetDropzoneId)
+      ) {
+        movedFocusToTarget = true;
+        break;
+      }
+    }
+    if (movedFocusToTarget) break;
+  }
+
+  if (!movedFocusToTarget) {
+    const sourceDropzoneId = getClickAndDragLabelPlacement(labelId, doc);
+    const sourceIndex = categories.findIndex(
+      (category) => category.dropzoneId === sourceDropzoneId
+    );
+    const delta = sourceIndex >= 0 ? targetIndex - sourceIndex : targetIndex;
+
+    if (delta !== 0) {
+      const movementKey = delta < 0 ? "ArrowUp" : "ArrowDown";
+      const movementCode = movementKey;
+      const movementKeyCode = delta < 0 ? 38 : 40;
+      const steps = Math.min(
+        Math.abs(delta),
+        CLICK_AND_DRAG_MOVE_MAX_KEYBOARD_STEPS
+      );
+
+      for (let step = 0; step < steps; step += 1) {
+        dispatchKeyboardSequence(labelNode, movementKey, movementCode, movementKeyCode);
+        await delay(50);
+      }
+    }
+  }
+
+  dispatchKeyboardSequence(labelNode, liftConfig.key, liftConfig.code, liftConfig.keyCode);
+  await delay(150);
+
+  return isClickAndDragLabelInDropzone(labelId, targetDropzoneId, doc);
+}
+
+async function moveClickAndDragLabelToDropzone(
+  labelId,
+  targetDropzoneId,
+  doc = getClickAndDragDocument()
+) {
+  if (!labelId || !targetDropzoneId || !doc) return false;
+  if (isClickAndDragLabelInDropzone(labelId, targetDropzoneId, doc)) return true;
+
+  const strategies = [
+    () => attemptClickAndDragPointerMove(labelId, targetDropzoneId, doc),
+    () => attemptClickAndDragHtml5Move(labelId, targetDropzoneId, doc),
+    () => attemptClickAndDragClickMove(labelId, targetDropzoneId, doc),
+    () =>
+      attemptClickAndDragKeyboardMove(
+        labelId,
+        targetDropzoneId,
+        { key: " ", code: "Space", keyCode: 32 },
+        doc
+      ),
+    () =>
+      attemptClickAndDragKeyboardMove(
+        labelId,
+        targetDropzoneId,
+        { key: "Enter", code: "Enter", keyCode: 13 },
+        doc
+      ),
+  ];
+
+  for (const strategy of strategies) {
+    let moved = false;
+    try {
+      moved = await strategy();
+    } catch (error) {
+      moved = false;
+    }
+
+    if (moved || isClickAndDragLabelInDropzone(labelId, targetDropzoneId, doc)) {
+      return true;
+    }
+  }
+
+  return isClickAndDragLabelInDropzone(labelId, targetDropzoneId, doc);
+}
+
+async function applyClickAndDragMoves(
+  moves,
+  doc = getClickAndDragDocument()
+) {
+  if (!Array.isArray(moves) || moves.length === 0 || !doc) {
+    return {
+      allApplied: false,
+      unresolvedMoves: Array.isArray(moves) ? moves.slice() : [],
+      alignedCount: 0,
+      resolvedCount: Array.isArray(moves) ? moves.length : 0,
+    };
+  }
+
+  const pendingMoves = new Map();
+  moves.forEach((move) => {
+    pendingMoves.set(move.labelId, move);
+  });
+
+  for (let pass = 1; pass <= CLICK_AND_DRAG_MOVE_MAX_PASSES; pass += 1) {
+    if (pendingMoves.size === 0) break;
+
+    let progressMade = false;
+    const passMoves = Array.from(pendingMoves.values());
+
+    for (const move of passMoves) {
+      if (!pendingMoves.has(move.labelId)) continue;
+
+      if (isClickAndDragLabelInDropzone(move.labelId, move.targetDropzoneId, doc)) {
+        pendingMoves.delete(move.labelId);
+        progressMade = true;
+        continue;
+      }
+
+      const moved = await moveClickAndDragLabelToDropzone(
+        move.labelId,
+        move.targetDropzoneId,
+        doc
+      );
+      if (moved) {
+        pendingMoves.delete(move.labelId);
+        progressMade = true;
+      } else {
+        console.info(LOG_PREFIX, "Click-and-drag move attempt failed", {
+          label: move.labelText,
+          target: move.categoryText,
+          currentDropzoneId: getClickAndDragLabelPlacement(move.labelId, doc) || "pool",
+          targetDropzoneId: move.targetDropzoneId,
+          pass,
+        });
+      }
+    }
+
+    if (!progressMade) {
+      break;
+    }
+  }
+
+  return {
+    allApplied: pendingMoves.size === 0,
+    unresolvedMoves: Array.from(pendingMoves.values()),
+    alignedCount: countClickAndDragAlignedMoves(moves, doc),
+    resolvedCount: moves.length,
+  };
+}
+
+function formatClickAndDragManualIssueLines(
+  targetPlan,
+  unresolvedMoves
+) {
+  const lines = [];
+
+  if (Array.isArray(unresolvedMoves)) {
+    unresolvedMoves.forEach((move) => {
+      lines.push(`${move.labelText} -> ${move.categoryText}`);
+    });
+  }
+
+  if (Array.isArray(targetPlan?.unresolved)) {
+    targetPlan.unresolved.forEach((entry) => {
+      const pairText =
+        entry.raw ||
+        `${entry.labelRef || "(unresolved label)"} -> ${
+          entry.categoryRef || "(unresolved category)"
+        }`;
+      lines.push(`${pairText}`);
+    });
+  }
+
+  if (Array.isArray(targetPlan?.conflicts)) {
+    targetPlan.conflicts.forEach((entry) => {
+      lines.push(
+        `${entry.labelText} -> ${entry.requestedCategoryText} (conflicts with ${entry.existingCategoryText})`
+      );
+    });
+  }
+
+  const seen = new Set();
+  return lines.filter((line) => {
+    const key = normalizeQuizText(line).toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function getClickAndDragPlacementFingerprint() {
@@ -1140,18 +2425,27 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
     const preApplyNextEnabled = isNextQuizButtonEnabled();
     const preApplyFingerprint = getAnswerCommitFingerprint();
 
-    let answerApplication = applyQuizAnswer(answer);
+    let answerApplication = await applyQuizAnswer(answer);
 
     if (!answerApplication.applied) {
       console.warn(LOG_PREFIX, "Unable to apply answer; refusing to advance", answer);
       if (isAutomating) {
         const failureSnapshot = getQuizStateSnapshot();
+        const manualRecoveryAnswer =
+          answerApplication.manualRecoveryAnswer !== undefined
+            ? answerApplication.manualRecoveryAnswer
+            : answer;
+        const manualRecoveryReason =
+          answerApplication.manualRecoveryReason ||
+          "Could not apply answer reliably. Paused to avoid skipping.";
+        const manualRecoveryPreFingerprint =
+          answerApplication.manualRecoveryPreFingerprint || preApplyFingerprint;
         pauseForManualRecovery({
-          answer,
-          reason: "Could not apply answer reliably. Paused to avoid skipping.",
+          answer: manualRecoveryAnswer,
+          reason: manualRecoveryReason,
           questionType:
             answerApplication.type || failureSnapshot.questionType || "unknown",
-          preApplyFingerprint,
+          preApplyFingerprint: manualRecoveryPreFingerprint,
           questionSignature: failureSnapshot.signature || "",
         });
       }
@@ -1179,16 +2473,25 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
     } catch (commitError) {
       // Retry one re-application pass before failing closed.
       clearAutomationAnswerMarkers();
-      answerApplication = applyQuizAnswer(answer);
+      answerApplication = await applyQuizAnswer(answer);
       if (!answerApplication.applied) {
         if (isAutomating) {
           const failureSnapshot = getQuizStateSnapshot();
+          const manualRecoveryAnswer =
+            answerApplication.manualRecoveryAnswer !== undefined
+              ? answerApplication.manualRecoveryAnswer
+              : answer;
+          const manualRecoveryReason =
+            answerApplication.manualRecoveryReason ||
+            "Could not re-apply answer reliably. Paused to avoid skipping.";
+          const manualRecoveryPreFingerprint =
+            answerApplication.manualRecoveryPreFingerprint || preApplyFingerprint;
           pauseForManualRecovery({
-            answer,
-            reason: "Could not re-apply answer reliably. Paused to avoid skipping.",
+            answer: manualRecoveryAnswer,
+            reason: manualRecoveryReason,
             questionType:
               answerApplication.type || failureSnapshot.questionType || "unknown",
-            preApplyFingerprint,
+            preApplyFingerprint: manualRecoveryPreFingerprint,
             questionSignature: failureSnapshot.signature || "",
           });
         }
@@ -1488,15 +2791,131 @@ function handleFillInTheBlankAnswer(answer) {
   };
 }
 
-function handleClickAndDragAnswer() {
+async function handleClickAndDragAnswer(answer) {
+  const doc = getClickAndDragDocument();
+  if (!doc) {
+    return {
+      applied: false,
+      type: "click_and_drag",
+      verify: () => false,
+      manualRecoveryReason:
+        "Click-and-drag tool was not available. Paused to avoid skipping.",
+      manualRecoveryAnswer: answer,
+      manualRecoveryPreFingerprint: getAnswerCommitFingerprint(),
+    };
+  }
+
+  const targetPlan = normalizeClickAndDragTargets(answer, doc);
+  const verify = () =>
+    isClickAndDragAligned(
+      targetPlan.resolvedMoves,
+      getClickAndDragDocument()
+    );
+
+  console.info(LOG_PREFIX, "Click-and-drag target plan", {
+    resolved: targetPlan.resolvedMoves.length,
+    unresolved: targetPlan.unresolved.length,
+    conflicts: targetPlan.conflicts.length,
+    duplicates: targetPlan.duplicates.length,
+  });
+
+  if (!targetPlan.entries.length) {
+    return {
+      applied: false,
+      type: "click_and_drag",
+      verify,
+      manualRecoveryReason:
+        "AI response did not contain usable 'Label -> Category' mappings. Paused to avoid skipping.",
+      manualRecoveryAnswer: answer,
+      manualRecoveryPreFingerprint: getAnswerCommitFingerprint(),
+    };
+  }
+
+  if (!targetPlan.labelCandidates.length || !targetPlan.categoryCandidates.length) {
+    return {
+      applied: false,
+      type: "click_and_drag",
+      verify,
+      manualRecoveryReason:
+        "Click-and-drag labels or categories were not ready. Paused to avoid skipping.",
+      manualRecoveryAnswer: answer,
+      manualRecoveryPreFingerprint: getAnswerCommitFingerprint(),
+    };
+  }
+
+  let moveResult = {
+    allApplied: false,
+    unresolvedMoves: targetPlan.resolvedMoves.slice(),
+    alignedCount: 0,
+    resolvedCount: targetPlan.resolvedMoves.length,
+  };
+
+  if (targetPlan.resolvedMoves.length > 0) {
+    moveResult = await applyClickAndDragMoves(targetPlan.resolvedMoves, doc);
+    console.info(LOG_PREFIX, "Click-and-drag move result", {
+      resolved: moveResult.resolvedCount,
+      aligned: moveResult.alignedCount,
+      unresolvedMoves: moveResult.unresolvedMoves.length,
+    });
+  }
+
+  const blockingIssueCount =
+    moveResult.unresolvedMoves.length +
+    targetPlan.unresolved.length +
+    targetPlan.conflicts.length;
+  const alignedCount = countClickAndDragAlignedMoves(
+    targetPlan.resolvedMoves,
+    getClickAndDragDocument()
+  );
+
+  if (moveResult.allApplied && blockingIssueCount === 0 && verify()) {
+    return {
+      applied: true,
+      type: "click_and_drag",
+      verify,
+    };
+  }
+
+  const issueLines = formatClickAndDragManualIssueLines(
+    targetPlan,
+    moveResult.unresolvedMoves
+  );
+  const issueCount = issueLines.length;
+  const reasonParts = [];
+  if (alignedCount > 0) {
+    reasonParts.push(
+      `Auto-placed ${alignedCount} label${alignedCount === 1 ? "" : "s"}.`
+    );
+  }
+  if (issueCount > 0) {
+    reasonParts.push(
+      `${issueCount} mapping${issueCount === 1 ? "" : "s"} still need manual placement.`
+    );
+  } else {
+    reasonParts.push(
+      "Could not fully verify click-and-drag placement. Please confirm manually."
+    );
+  }
+
+  if (targetPlan.conflicts.length > 0) {
+    reasonParts.push(
+      `Detected ${targetPlan.conflicts.length} conflicting mapping${
+        targetPlan.conflicts.length === 1 ? "" : "s"
+      }.`
+    );
+  }
+
   return {
     applied: false,
     type: "click_and_drag",
-    verify: () => false,
+    verify,
+    manualRecoveryReason: reasonParts.join(" "),
+    manualRecoveryAnswer: issueLines.length > 0 ? issueLines : answer,
+    manualRecoveryPreFingerprint: getAnswerCommitFingerprint(),
   };
 }
 
-function applyQuizAnswer(answer) {
+async function applyQuizAnswer(answer) {
   if (document.querySelector(".answers-wrap.multiple-choice")) {
     return handleMultipleChoiceAnswer(answer);
   }
