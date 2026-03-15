@@ -12,10 +12,22 @@ const READINESS_POLL_INTERVAL_MS = 60;
 const NEXT_STEP_RETRY_DELAY_MS = 240;
 const QUESTION_TRANSITION_TIMEOUT_MS = 4500;
 const POST_ANSWER_PROGRESS_TIMEOUT_MS = 3500;
+const ANSWER_DELAY_DEFAULTS = Object.freeze({
+  enabled: true,
+  averageSec: 12,
+  jitterSec: 3,
+});
+const ANSWER_DELAY_LIMITS = Object.freeze({
+  averageMin: 6,
+  averageMax: 45,
+  jitterMin: 0,
+  jitterMax: 10,
+});
 let scheduledNextStepTimeoutId = null;
 let isCheckingNextStep = false;
 const questionPerfMarks = new Map();
 let pendingAdvancePerf = null;
+let answerDelayConfig = { ...ANSWER_DELAY_DEFAULTS };
 
 function createQuestionId() {
   questionSequence += 1;
@@ -45,6 +57,95 @@ function markQuestionPerf(questionId, key, timestamp = Date.now()) {
 function clearQuestionPerf(questionId) {
   if (!questionId) return;
   questionPerfMarks.delete(questionId);
+}
+
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function parseNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function sanitizeAnswerDelayConfig(rawConfig = {}) {
+  const enabled =
+    typeof rawConfig.answerDelayEnabled === "boolean"
+      ? rawConfig.answerDelayEnabled
+      : ANSWER_DELAY_DEFAULTS.enabled;
+  const averageSec = clampNumber(
+    Math.round(
+      parseNumber(rawConfig.answerDelayAverageSec, ANSWER_DELAY_DEFAULTS.averageSec)
+    ),
+    ANSWER_DELAY_LIMITS.averageMin,
+    ANSWER_DELAY_LIMITS.averageMax
+  );
+  const jitterSec = clampNumber(
+    Math.round(
+      parseNumber(rawConfig.answerDelayJitterSec, ANSWER_DELAY_DEFAULTS.jitterSec) * 10
+    ) / 10,
+    ANSWER_DELAY_LIMITS.jitterMin,
+    ANSWER_DELAY_LIMITS.jitterMax
+  );
+
+  return {
+    enabled,
+    averageSec,
+    jitterSec,
+  };
+}
+
+function shouldNormalizeAnswerDelayConfig(rawConfig, sanitizedConfig) {
+  return (
+    rawConfig.answerDelayEnabled !== sanitizedConfig.enabled ||
+    Number(rawConfig.answerDelayAverageSec) !== sanitizedConfig.averageSec ||
+    Number(rawConfig.answerDelayJitterSec) !== sanitizedConfig.jitterSec
+  );
+}
+
+function setAnswerDelayConfig(rawConfig = {}) {
+  answerDelayConfig = sanitizeAnswerDelayConfig(rawConfig);
+}
+
+function setupAnswerDelayConfigSync() {
+  chrome.storage.sync.get(
+    ["answerDelayEnabled", "answerDelayAverageSec", "answerDelayJitterSec"],
+    (data) => {
+      const sanitizedConfig = sanitizeAnswerDelayConfig(data);
+      answerDelayConfig = sanitizedConfig;
+
+      if (shouldNormalizeAnswerDelayConfig(data, sanitizedConfig)) {
+        chrome.storage.sync.set({
+          answerDelayEnabled: sanitizedConfig.enabled,
+          answerDelayAverageSec: sanitizedConfig.averageSec,
+          answerDelayJitterSec: sanitizedConfig.jitterSec,
+        });
+      }
+    }
+  );
+
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName && areaName !== "sync") return;
+    if (
+      !changes.answerDelayEnabled &&
+      !changes.answerDelayAverageSec &&
+      !changes.answerDelayJitterSec
+    ) {
+      return;
+    }
+
+    setAnswerDelayConfig({
+      answerDelayEnabled: changes.answerDelayEnabled
+        ? changes.answerDelayEnabled.newValue
+        : answerDelayConfig.enabled,
+      answerDelayAverageSec: changes.answerDelayAverageSec
+        ? changes.answerDelayAverageSec.newValue
+        : answerDelayConfig.averageSec,
+      answerDelayJitterSec: changes.answerDelayJitterSec
+        ? changes.answerDelayJitterSec.newValue
+        : answerDelayConfig.jitterSec,
+    });
+  });
 }
 
 function waitForCondition(
@@ -921,6 +1022,51 @@ function dispatchKeyboardSequence(target, key, code, keyCode) {
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getAnswerDelayPlan(questionId) {
+  if (!answerDelayConfig.enabled) {
+    return {
+      enabled: false,
+      targetMs: 0,
+      elapsedMs: 0,
+      holdMs: 0,
+    };
+  }
+
+  const averageMs = answerDelayConfig.averageSec * 1000;
+  const jitterMs = answerDelayConfig.jitterSec * 1000;
+  const jitterFactor = Math.random() + Math.random() - 1;
+  const targetMs = Math.max(0, Math.round(averageMs + jitterMs * jitterFactor));
+  const perfEntry = questionId ? ensureQuestionPerfEntry(questionId) : null;
+  const dispatchedAt = perfEntry?.dispatchedAt || Date.now();
+  const elapsedMs = Math.max(0, Date.now() - dispatchedAt);
+  const holdMs = Math.max(0, targetMs - elapsedMs);
+
+  return {
+    enabled: true,
+    targetMs,
+    elapsedMs,
+    holdMs,
+  };
+}
+
+async function applyHumanlikeAnswerDelay(activeQuestionId) {
+  if (!isAutomating) return false;
+
+  const delayPlan = getAnswerDelayPlan(activeQuestionId);
+  if (!delayPlan.enabled) return true;
+
+  logPerf(
+    `${activeQuestionId || "unknown"} pacing target=${delayPlan.targetMs}ms elapsed=${delayPlan.elapsedMs}ms hold=${delayPlan.holdMs}ms`
+  );
+
+  if (delayPlan.holdMs <= 0) {
+    return isAutomating;
+  }
+
+  await delay(delayPlan.holdMs);
+  return isAutomating;
 }
 
 function findOrderingChoiceIndex(choiceItems, answerText, startIndex = 0) {
@@ -2069,19 +2215,29 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
       return;
     }
 
+    const response = parseAiResponse(responseText);
+    lastResponseFormatIssue = null;
+
+    lastIncorrectQuestion = null;
+    lastCorrectAnswer = null;
+
+    if (isAutomating) {
+      const shouldProceedWithAnswer = await applyHumanlikeAnswerDelay(
+        activeQuestionId
+      );
+      if (!shouldProceedWithAnswer) {
+        return;
+      }
+    }
+
     const container = document.querySelector(".probe-container");
     if (!container) return;
     const questionType = detectQuestionType(container);
-    const response = parseAiResponse(responseText);
     const answers = normalizeResponseAnswers(
       response.answer,
       questionType,
       container
     );
-    lastResponseFormatIssue = null;
-
-    lastIncorrectQuestion = null;
-    lastCorrectAnswer = null;
 
     if (questionType === "matching") {
       const applied = await applyMatchingAnswer(container, response.answer);
@@ -2519,6 +2675,7 @@ function waitForElement(selector, timeout = 5000) {
   });
 }
 
+setupAnswerDelayConfigSync();
 setupMessageListener();
 addAssistantButton();
 

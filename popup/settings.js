@@ -2,15 +2,35 @@ document.addEventListener("DOMContentLoaded", function () {
   const DEEPSEEK_URL_PATTERNS = [
     "https://chat.deepseek.com/*",
   ];
+  const ANSWER_DELAY_DEFAULTS = Object.freeze({
+    enabled: true,
+    averageSec: 12,
+    jitterSec: 3,
+  });
+  const ANSWER_DELAY_LIMITS = Object.freeze({
+    averageMin: 6,
+    averageMax: 45,
+    jitterMin: 0,
+    jitterMax: 10,
+  });
   const chatgptButton = document.getElementById("chatgpt");
   const geminiButton = document.getElementById("gemini");
   const deepseekButton = document.getElementById("deepseek");
   const statusMessage = document.getElementById("status-message");
+  const answerDelayEnabledInput = document.getElementById(
+    "answer-delay-enabled"
+  );
+  const answerDelayAverageInput = document.getElementById("answer-delay-average");
+  const answerDelayJitterInput = document.getElementById("answer-delay-jitter");
+  const answerDelaySaveStatus = document.getElementById(
+    "answer-delay-save-status"
+  );
   const currentVersionElement = document.getElementById("current-version");
   const latestVersionElement = document.getElementById("latest-version");
   const versionStatusElement = document.getElementById("version-status");
   const checkUpdatesButton = document.getElementById("check-updates");
   const footerVersionElement = document.getElementById("footer-version");
+  let answerDelaySaveStatusTimeoutId = null;
 
   const currentVersion = chrome.runtime.getManifest().version;
   currentVersionElement.textContent = `v${currentVersion}`;
@@ -37,6 +57,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     checkModelAvailability(currentModel);
   });
+  loadAnswerDelaySettings();
 
   chatgptButton.addEventListener("click", function () {
     setActiveModel("chatgpt");
@@ -49,6 +70,140 @@ document.addEventListener("DOMContentLoaded", function () {
   deepseekButton.addEventListener("click", function () {
     setActiveModel("deepseek");
   });
+  answerDelayEnabledInput.addEventListener("change", function () {
+    saveAnswerDelaySettingsFromInputs("Answer delay settings saved.");
+  });
+  answerDelayAverageInput.addEventListener("change", function () {
+    saveAnswerDelaySettingsFromInputs("Answer delay settings saved.");
+  });
+  answerDelayJitterInput.addEventListener("change", function () {
+    saveAnswerDelaySettingsFromInputs("Answer delay settings saved.");
+  });
+
+  function clampNumber(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function parseNumber(value, fallback) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function sanitizeAnswerDelayConfig(rawConfig = {}) {
+    const enabled =
+      typeof rawConfig.answerDelayEnabled === "boolean"
+        ? rawConfig.answerDelayEnabled
+        : ANSWER_DELAY_DEFAULTS.enabled;
+
+    const averageSec = clampNumber(
+      Math.round(
+        parseNumber(rawConfig.answerDelayAverageSec, ANSWER_DELAY_DEFAULTS.averageSec)
+      ),
+      ANSWER_DELAY_LIMITS.averageMin,
+      ANSWER_DELAY_LIMITS.averageMax
+    );
+
+    const jitterSec = clampNumber(
+      Math.round(
+        parseNumber(rawConfig.answerDelayJitterSec, ANSWER_DELAY_DEFAULTS.jitterSec) *
+          10
+      ) / 10,
+      ANSWER_DELAY_LIMITS.jitterMin,
+      ANSWER_DELAY_LIMITS.jitterMax
+    );
+
+    return {
+      enabled,
+      averageSec,
+      jitterSec,
+    };
+  }
+
+  function shouldNormalizeAnswerDelayConfig(rawConfig, sanitizedConfig) {
+    return (
+      rawConfig.answerDelayEnabled !== sanitizedConfig.enabled ||
+      Number(rawConfig.answerDelayAverageSec) !== sanitizedConfig.averageSec ||
+      Number(rawConfig.answerDelayJitterSec) !== sanitizedConfig.jitterSec
+    );
+  }
+
+  function setAnswerDelayInputEnabledState(enabled) {
+    answerDelayAverageInput.disabled = !enabled;
+    answerDelayJitterInput.disabled = !enabled;
+  }
+
+  function renderAnswerDelayConfig(config) {
+    answerDelayEnabledInput.checked = config.enabled;
+    answerDelayAverageInput.value = String(config.averageSec);
+    answerDelayJitterInput.value = String(config.jitterSec);
+    setAnswerDelayInputEnabledState(config.enabled);
+  }
+
+  function setAnswerDelaySaveStatus(message, className = "") {
+    answerDelaySaveStatus.textContent = message;
+    answerDelaySaveStatus.className = className;
+
+    if (answerDelaySaveStatusTimeoutId !== null) {
+      clearTimeout(answerDelaySaveStatusTimeoutId);
+      answerDelaySaveStatusTimeoutId = null;
+    }
+
+    if (message) {
+      answerDelaySaveStatusTimeoutId = setTimeout(() => {
+        answerDelaySaveStatus.textContent = "";
+        answerDelaySaveStatus.className = "";
+        answerDelaySaveStatusTimeoutId = null;
+      }, 2200);
+    }
+  }
+
+  function persistAnswerDelayConfig(sanitizedConfig, statusMessage = "") {
+    chrome.storage.sync.set(
+      {
+        answerDelayEnabled: sanitizedConfig.enabled,
+        answerDelayAverageSec: sanitizedConfig.averageSec,
+        answerDelayJitterSec: sanitizedConfig.jitterSec,
+      },
+      function () {
+        if (chrome.runtime.lastError) {
+          setAnswerDelaySaveStatus(
+            "Failed to save answer delay settings.",
+            "error"
+          );
+          return;
+        }
+
+        if (statusMessage) {
+          setAnswerDelaySaveStatus(statusMessage, "success");
+        }
+      }
+    );
+  }
+
+  function loadAnswerDelaySettings() {
+    chrome.storage.sync.get(
+      ["answerDelayEnabled", "answerDelayAverageSec", "answerDelayJitterSec"],
+      function (data) {
+        const sanitizedConfig = sanitizeAnswerDelayConfig(data);
+        renderAnswerDelayConfig(sanitizedConfig);
+
+        if (shouldNormalizeAnswerDelayConfig(data, sanitizedConfig)) {
+          persistAnswerDelayConfig(sanitizedConfig);
+        }
+      }
+    );
+  }
+
+  function saveAnswerDelaySettingsFromInputs(statusMessage = "") {
+    const sanitizedConfig = sanitizeAnswerDelayConfig({
+      answerDelayEnabled: answerDelayEnabledInput.checked,
+      answerDelayAverageSec: answerDelayAverageInput.value,
+      answerDelayJitterSec: answerDelayJitterInput.value,
+    });
+
+    renderAnswerDelayConfig(sanitizedConfig);
+    persistAnswerDelayConfig(sanitizedConfig, statusMessage);
+  }
 
   function setActiveModel(model) {
     chrome.storage.sync.set({ aiModel: model }, function () {

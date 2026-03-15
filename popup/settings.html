@@ -107,6 +107,49 @@
       </div>
 
       <div class="settings-section">
+        <h2>Answer Delay</h2>
+        <p>
+          Add humanlike pacing before automation submits the answer on each
+          question.
+        </p>
+        <p class="delay-defaults">
+          Defaults: Enabled, 12s average, +/-3s jitter.
+        </p>
+
+        <div class="delay-settings-grid">
+          <label class="delay-setting-row delay-toggle-row" for="answer-delay-enabled">
+            <span class="delay-setting-label">Enable delay</span>
+            <input type="checkbox" id="answer-delay-enabled" />
+          </label>
+
+          <label class="delay-setting-row" for="answer-delay-average">
+            <span class="delay-setting-label">Average seconds</span>
+            <input
+              type="number"
+              id="answer-delay-average"
+              min="6"
+              max="45"
+              step="1"
+              inputmode="numeric"
+            />
+          </label>
+
+          <label class="delay-setting-row" for="answer-delay-jitter">
+            <span class="delay-setting-label">Jitter (+/- seconds)</span>
+            <input
+              type="number"
+              id="answer-delay-jitter"
+              min="0"
+              max="10"
+              step="0.5"
+              inputmode="decimal"
+            />
+          </label>
+        </div>
+        <div id="answer-delay-save-status"></div>
+      </div>
+
+      <div class="settings-section">
         <h2>Version Information</h2>
         <div class="version-info">
           <div class="version-current">
