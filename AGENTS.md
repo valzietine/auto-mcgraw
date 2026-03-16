@@ -63,3 +63,9 @@ Fallback behavior:
 - Use `default` when no specialist clearly fits.
 
 The parent agent remains responsible for the final result. Subagents are for focused execution and evidence gathering, not for offloading ownership.
+
+## Testing Requirements
+
+- Live test runs are required for changes that affect real site integrations, browser automation, selectors, extraction logic, or question-answering behavior.
+- Do not treat static inspection, unit-level checks, or synthetic simulations as sufficient sign-off when the affected flow can be exercised against the live site.
+- Record the live test result in the final handoff, including what was exercised and any blockers if a full live run could not be completed.
