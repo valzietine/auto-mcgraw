@@ -200,6 +200,71 @@ function waitForEnabledElement(selector, timeout = 5000) {
   }, timeout);
 }
 
+function hasQuestionCorrectnessFeedback(container) {
+  if (!container) return false;
+
+  return Boolean(
+    container.querySelector(
+      ".awd-probe-correctness.correct, .awd-probe-correctness.incorrect, .correct-answer-container"
+    )
+  );
+}
+
+function getQuestionProgressState(
+  container = document.querySelector(".probe-container")
+) {
+  const nextButton = getNextButton();
+
+  return {
+    container,
+    hasCorrectness: hasQuestionCorrectnessFeedback(container),
+    hasIncorrect: Boolean(
+      container?.querySelector(".awd-probe-correctness.incorrect")
+    ),
+    nextButton,
+    nextEnabled: Boolean(nextButton && !isElementDisabled(nextButton)),
+  };
+}
+
+async function waitForQuestionCorrectnessFeedback(questionId = null, timeout = 6000) {
+  let nextEnabledAt = null;
+
+  return waitForCondition(() => {
+    const state = getQuestionProgressState();
+    if (!state.container) return null;
+
+    if (state.hasCorrectness) {
+      if (nextEnabledAt !== null) {
+        const elapsedMs = Date.now() - nextEnabledAt;
+        logPerf(
+          `${questionId || "unknown"} nextEnabled->feedback ${elapsedMs}ms`
+        );
+      }
+
+      return {
+        ...state,
+        settledBy: "correctness",
+      };
+    }
+
+    if (!state.nextEnabled) {
+      nextEnabledAt = null;
+      return null;
+    }
+
+    if (nextEnabledAt === null) {
+      nextEnabledAt = Date.now();
+      console.info(
+        LOG_PREFIX,
+        "Next enabled before correctness feedback; waiting for McGraw result",
+        questionId
+      );
+    }
+
+    return null;
+  }, timeout);
+}
+
 function scheduleCheckForNextStep(delayMs = 0, reason = "") {
   if (!isAutomating) return;
 
@@ -331,29 +396,7 @@ function getNextButton() {
 function isQuestionCompleted(container) {
   if (!container) return false;
 
-  if (
-    container.querySelector(
-      ".awd-probe-correctness.correct, .awd-probe-correctness.incorrect"
-    )
-  ) {
-    return true;
-  }
-
-  if (container.querySelector(".correct-answer-container")) {
-    return true;
-  }
-
-  const highConfidenceButton = document.querySelector(
-    '[data-automation-id="confidence-buttons--high_confidence"]'
-  );
-  const nextButton = getNextButton();
-
-  return (
-    highConfidenceButton &&
-    isElementDisabled(highConfidenceButton) &&
-    nextButton &&
-    !isElementDisabled(nextButton)
-  );
+  return hasQuestionCorrectnessFeedback(container);
 }
 
 function advanceCompletedQuestionIfNeeded(container) {
@@ -2328,14 +2371,9 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
             return { type: "confidence", button: confidenceButton };
           }
 
-          const nextButton = getNextButton();
-          const hasCorrectness = Boolean(
-            liveContainer.querySelector(
-              ".awd-probe-correctness.correct, .awd-probe-correctness.incorrect, .correct-answer-container"
-            )
-          );
+          const progressState = getQuestionProgressState(liveContainer);
 
-          if (hasCorrectness || (nextButton && !isElementDisabled(nextButton))) {
+          if (progressState.hasCorrectness) {
             return { type: "ready_without_confidence" };
           }
 
@@ -2362,28 +2400,40 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
           }
         }
 
+        let postAnswerProgress = null;
         try {
-          progressionStage = "wait_post_confidence_readiness";
-          await waitForCondition(() => {
-            const liveContainer = document.querySelector(".probe-container");
-            if (!liveContainer) return false;
-
-            const hasCorrectness = Boolean(
-              liveContainer.querySelector(
-                ".awd-probe-correctness.correct, .awd-probe-correctness.incorrect, .correct-answer-container"
-              )
+          progressionStage = "wait_post_confidence_correctness";
+          postAnswerProgress = await waitForQuestionCorrectnessFeedback(
+            activeQuestionId,
+            6000
+          );
+        } catch (error) {
+          console.warn(
+            LOG_PREFIX,
+            "McGraw did not render correctness feedback; stopping to avoid blind advance",
+            activeQuestionId,
+            error
+          );
+          if (isAutomating) {
+            isAutomating = false;
+            clearAutomationRuntimeState();
+            clearMatchingPauseWatcher();
+            alert(
+              "McGraw never reported whether the answer was correct or incorrect. Automation stopped to avoid skipping the question."
             );
-            const nextButton = getNextButton();
-            if (hasCorrectness) return true;
-            return nextButton && !isElementDisabled(nextButton);
-          }, 6000);
-        } catch (error) {}
+          }
+          return;
+        }
 
-        const latestContainer = document.querySelector(".probe-container") || container;
-        const incorrectMarker = latestContainer.querySelector(
-          ".awd-probe-correctness.incorrect"
-        );
-        if (incorrectMarker) {
+        const latestContainer =
+          postAnswerProgress?.container ||
+          document.querySelector(".probe-container") ||
+          container;
+
+        if (
+          postAnswerProgress?.hasIncorrect ||
+          latestContainer.querySelector(".awd-probe-correctness.incorrect")
+        ) {
           const correctionData = extractCorrectAnswer();
           if (correctionData && correctionData.answer) {
             lastIncorrectQuestion = correctionData.question;
