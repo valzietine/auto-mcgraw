@@ -26,6 +26,9 @@ document.addEventListener("DOMContentLoaded", function () {
   const answerDelaySaveStatus = document.getElementById(
     "answer-delay-save-status"
   );
+  const pauseBeforeSubmitToggle = document.getElementById(
+    "pause-before-submit-toggle"
+  );
   const currentVersionElement = document.getElementById("current-version");
   const latestVersionElement = document.getElementById("latest-version");
   const versionStatusElement = document.getElementById("version-status");
@@ -59,6 +62,7 @@ document.addEventListener("DOMContentLoaded", function () {
     checkModelAvailability(currentModel);
   });
   loadAnswerDelaySettings();
+  loadPauseBeforeSubmitSetting();
 
   chatgptButton.addEventListener("click", function () {
     setActiveModel("chatgpt");
@@ -79,6 +83,11 @@ document.addEventListener("DOMContentLoaded", function () {
   });
   answerDelayJitterInput.addEventListener("change", function () {
     saveAnswerDelaySettingsFromInputs("Answer delay settings saved.");
+  });
+  pauseBeforeSubmitToggle.addEventListener("change", function () {
+    chrome.storage.sync.set({
+      pauseBeforeSubmit: pauseBeforeSubmitToggle.checked,
+    });
   });
 
   function clampNumber(value, min, max) {
@@ -204,6 +213,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
     renderAnswerDelayConfig(sanitizedConfig);
     persistAnswerDelayConfig(sanitizedConfig, statusMessage);
+  }
+
+  function loadPauseBeforeSubmitSetting() {
+    chrome.storage.sync.get(["pauseBeforeSubmit"], function (data) {
+      pauseBeforeSubmitToggle.checked = Boolean(data.pauseBeforeSubmit);
+    });
   }
 
   function setActiveModel(model) {

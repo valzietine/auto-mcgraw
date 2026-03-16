@@ -28,6 +28,7 @@ let isCheckingNextStep = false;
 const questionPerfMarks = new Map();
 let pendingAdvancePerf = null;
 let answerDelayConfig = { ...ANSWER_DELAY_DEFAULTS };
+let pauseBeforeSubmit = false;
 
 function createQuestionId() {
   questionSequence += 1;
@@ -145,6 +146,19 @@ function setupAnswerDelayConfigSync() {
         ? changes.answerDelayJitterSec.newValue
         : answerDelayConfig.jitterSec,
     });
+  });
+}
+
+function setupPauseBeforeSubmitSync() {
+  chrome.storage.sync.get(["pauseBeforeSubmit"], (data) => {
+    pauseBeforeSubmit = Boolean(data.pauseBeforeSubmit);
+  });
+
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName && areaName !== "sync") return;
+    if (!changes.pauseBeforeSubmit) return;
+
+    pauseBeforeSubmit = Boolean(changes.pauseBeforeSubmit.newValue);
   });
 }
 
@@ -438,7 +452,7 @@ async function waitForQuestionTransition(
   }
 }
 
-function pauseForManualMatchingAndResume(questionSignature) {
+function pauseForManualInterventionAndResume(questionSignature) {
   if (!questionSignature) return;
 
   clearMatchingPauseWatcher();
@@ -465,7 +479,7 @@ function pauseForManualMatchingAndResume(questionSignature) {
       );
       clearMatchingPauseWatcher();
 
-      scheduleCheckForNextStep(0, "manual_matching_resume");
+      scheduleCheckForNextStep(0, "manual_intervention_resume");
     }
   }, 250);
 }
@@ -2201,7 +2215,7 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
         );
 
         if (isAutomating) {
-          pauseForManualMatchingAndResume(questionSignature);
+          pauseForManualInterventionAndResume(questionSignature);
         }
 
         return;
@@ -2242,7 +2256,7 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
         );
 
         if (isAutomating) {
-          pauseForManualMatchingAndResume(questionSignature);
+          pauseForManualInterventionAndResume(questionSignature);
         }
 
         return;
@@ -2280,6 +2294,24 @@ async function processChatGPTResponse(responseText, responseQuestionId = null) {
           }ms`
         );
       }
+    }
+
+    if (isAutomating && pauseBeforeSubmit) {
+      const questionSignature = getQuestionSignature(container);
+      if (questionSignature) {
+        console.info(
+          LOG_PREFIX,
+          "Pause before submit enabled; waiting for manual progression",
+          questionSignature
+        );
+        pauseForManualInterventionAndResume(questionSignature);
+        return;
+      }
+
+      console.warn(
+        LOG_PREFIX,
+        "Pause before submit enabled but question signature was unavailable; continuing automatically"
+      );
     }
 
     if (isAutomating) {
@@ -2627,6 +2659,7 @@ function waitForElement(selector, timeout = 5000) {
 }
 
 setupAnswerDelayConfigSync();
+setupPauseBeforeSubmitSync();
 setupMessageListener();
 addAssistantButton();
 
