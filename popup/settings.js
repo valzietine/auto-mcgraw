@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", function () {
   const DEEPSEEK_URL_PATTERNS = [
     "https://chat.deepseek.com/*",
+    "https://deepseek.chat/*",
   ];
   const ANSWER_DELAY_DEFAULTS = Object.freeze({
     enabled: true,
@@ -267,7 +268,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   statusMessage.className = "success";
                 } else {
                   statusMessage.textContent =
-                    "Please open DeepSeek (chat.deepseek.com) in another tab to use this assistant.";
+                    "Please open DeepSeek in another tab to use this assistant.";
                   statusMessage.className = "error";
                 }
               }
