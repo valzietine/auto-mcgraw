@@ -9,6 +9,7 @@ const PERF_LOGGING_ENABLED = true;
 const INPUT_READY_TIMEOUT_MS = 10000;
 const SEND_READY_TIMEOUT_MS = 10000;
 const READINESS_POLL_INTERVAL_MS = 50;
+const GEMINI_IDLE_TIMEOUT_MS = 120000;
 
 function logPerf(message, ...args) {
   if (!PERF_LOGGING_ENABLED) return;
@@ -50,7 +51,20 @@ function isSendButtonReady(button) {
   if (!button) return false;
   if (button.disabled) return false;
   if (button.getAttribute("aria-disabled") === "true") return false;
+  if (button.classList.contains("stop")) return false;
   return true;
+}
+
+function waitForIdle(timeout = GEMINI_IDLE_TIMEOUT_MS) {
+  return waitForCondition(
+    () => {
+      const sendButton = document.querySelector(".send-button");
+      if (!sendButton) return true;
+      return sendButton.classList.contains("stop") ? null : true;
+    },
+    timeout,
+    250
+  );
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -153,6 +167,7 @@ async function insertQuestion(questionData) {
 
   text +=
     '\n\nRespond with ONLY a valid JSON object with keys "answer" and "explanation". The "answer" field is required. Do not wrap the JSON in markdown or code fences. Escape any internal double quotes in strings (for example: \\"text\\"). Explanations should be no more than one sentence. DO NOT acknowledge corrections or format reminders; only answer the current question.';
+  await waitForIdle();
   const inputArea = await waitForCondition(
     () => document.querySelector(".ql-editor"),
     INPUT_READY_TIMEOUT_MS
