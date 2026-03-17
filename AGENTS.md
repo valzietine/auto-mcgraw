@@ -50,6 +50,7 @@
 
 ## Maintenance And Troubleshooting
 
+- Keep commits feature-based: group changes by a single fix, feature, or operational concern, and do not bundle unrelated work into the same commit.
 - If a run uncovers reproducibility tips such as Playwright commands, profile paths, launch flags, auth/state setup, or other operational shortcuts, append them here so future agents can re-create the exact flow without rediscovering the steps.
 - If an existing reproducibility note is outdated or no longer works, revise or replace it instead of leaving stale operational guidance behind.
 - If this file says a tool or path should be available and the current run is hanging or failing, do not treat that as final immediately. Persist through basic troubleshooting first: verify the binary/path, confirm auth, check for process/session conflicts, check ports and profile locks, try the documented alternate launch or attach path, and only report a blocker after those checks still fail.
