@@ -1129,33 +1129,28 @@ async function moveOrderingChoiceToIndex(
       isAnswerMatch(getOrderingChoiceText(item), movingText)
     );
 
-  const focusCurrentHandle = () => {
-    const currentItems = getOrderingChoiceItems(container);
-    const currentIndex = currentItems.findIndex((item) =>
-      isAnswerMatch(getOrderingChoiceText(item), movingText)
-    );
-    if (currentIndex < 0) return null;
+  const initialIndex = getCurrentIndex();
+  if (initialIndex < 0) {
+    return false;
+  }
 
-    const handle = getOrderingDragHandle(currentItems[currentIndex]);
-    if (!handle) return null;
-
-    if (typeof handle.focus === "function") {
-      try {
-        handle.focus({ preventScroll: true });
-      } catch (e) {
-        handle.focus();
-      }
-    }
-
-    return handle;
-  };
-
-  const initialHandle = focusCurrentHandle();
+  const initialHandle = getOrderingDragHandle(choiceItem);
   if (!initialHandle) {
     return false;
   }
+
+  if (typeof initialHandle.focus === "function") {
+    try {
+      initialHandle.focus({ preventScroll: true });
+    } catch (e) {
+      initialHandle.focus();
+    }
+  }
   await delay(40);
 
+  // Recharge/SmartBook ordering can keep DOM order stale while an item is lifted.
+  // Count the needed keyboard moves up front and dispatch them on the same handle,
+  // then verify the DOM after dropping.
   dispatchKeyboardSequence(
     initialHandle,
     liftConfig.key,
@@ -1164,48 +1159,29 @@ async function moveOrderingChoiceToIndex(
   );
   await delay(80);
 
-  const maxMoves = 60;
-  let moveCount = 0;
-  let stagnantMoves = 0;
-  while (moveCount < maxMoves) {
-    const currentIndex = getCurrentIndex();
-    if (currentIndex < 0 || currentIndex === targetIndex) {
-      break;
-    }
+  const delta = targetIndex - initialIndex;
+  const moveCount = Math.abs(delta);
+  const movementKey = delta < 0 ? "ArrowUp" : "ArrowDown";
+  const movementCode = movementKey;
+  const movementKeyCode = delta < 0 ? 38 : 40;
 
-    const handle = focusCurrentHandle();
-    if (!handle) {
-      break;
-    }
-
-    if (currentIndex > targetIndex) {
-      dispatchKeyboardSequence(handle, "ArrowUp", "ArrowUp", 38);
-    } else {
-      dispatchKeyboardSequence(handle, "ArrowDown", "ArrowDown", 40);
-    }
-
-    moveCount += 1;
-    await delay(60);
-
-    const nextIndex = getCurrentIndex();
-    if (nextIndex === currentIndex) {
-      stagnantMoves += 1;
-      if (stagnantMoves >= 3) {
-        break;
-      }
-    } else {
-      stagnantMoves = 0;
-    }
+  for (let step = 0; step < moveCount; step += 1) {
+    dispatchKeyboardSequence(
+      initialHandle,
+      movementKey,
+      movementCode,
+      movementKeyCode
+    );
+    await delay(70);
   }
 
-  const dropHandle = focusCurrentHandle() || initialHandle;
   dispatchKeyboardSequence(
-    dropHandle,
+    initialHandle,
     liftConfig.key,
     liftConfig.code,
     liftConfig.keyCode
   );
-  await delay(80);
+  await delay(120);
 
   return getCurrentIndex() === targetIndex;
 }
