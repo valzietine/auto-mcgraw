@@ -4,9 +4,9 @@
 
 <img src="assets/icon.png" alt="Auto-McGraw Logo" width="200">
 
-[![Release](https://img.shields.io/github/v/release/GooglyBlox/auto-mcgraw?include_prereleases&style=flat-square&cache=1)](https://github.com/GooglyBlox/auto-mcgraw/releases)
-[![License](https://img.shields.io/github/license/GooglyBlox/auto-mcgraw?style=flat-square&cache=1)](LICENSE)
-[![Issues](https://img.shields.io/github/issues/GooglyBlox/auto-mcgraw?style=flat-square&cache=1)](https://github.com/GooglyBlox/auto-mcgraw/issues)
+[![Release](https://img.shields.io/github/v/release/valzietine/auto-mcgraw?include_prereleases&style=flat-square&cache=1)](https://github.com/valzietine/auto-mcgraw/releases)
+[![License](https://img.shields.io/github/license/valzietine/auto-mcgraw?style=flat-square&cache=1)](LICENSE)
+[![Issues](https://img.shields.io/github/issues/valzietine/auto-mcgraw?style=flat-square&cache=1)](https://github.com/valzietine/auto-mcgraw/issues)
 
 *Automate your McGraw Hill Smartbook homework with AI integration (ChatGPT, Gemini & DeepSeek)*
 
@@ -41,7 +41,7 @@ As of **March 14, 2026**, `dev` is **24 commits ahead** and **17 commits behind*
 
 ## Installation
 
-1. Download the latest zip from the [releases page](https://github.com/GooglyBlox/auto-mcgraw/releases)
+1. Download the latest zip from the [releases page](https://github.com/valzietine/auto-mcgraw/releases)
 2. Extract the zip file to a folder
 3. Open Chrome and go to `chrome://extensions/`
 4. Enable "Developer mode" in the top right
@@ -88,4 +88,4 @@ Any third-party names, trademarks, logos, assets, or likenesses referenced or di
 
 ## Issues
 
-Found a bug? [Create an issue](https://github.com/GooglyBlox/auto-mcgraw/issues).
+Found a bug? [Create an issue](https://github.com/valzietine/auto-mcgraw/issues).

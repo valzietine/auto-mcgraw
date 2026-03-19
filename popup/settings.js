@@ -309,7 +309,7 @@ document.addEventListener("DOMContentLoaded", function () {
       latestVersionElement.textContent = "Checking...";
 
       const response = await fetch(
-        "https://api.github.com/repos/GooglyBlox/auto-mcgraw/releases/latest"
+        "https://api.github.com/repos/valzietine/auto-mcgraw/releases/latest"
       );
 
       if (!response.ok) {
