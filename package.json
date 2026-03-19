@@ -1,0 +1,13 @@
+{
+  "name": "auto-mcgraw-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "smoke:fixtures": "node scripts/fixture-smoke.mjs",
+    "smoke:fixtures:strict": "node scripts/fixture-smoke.mjs --strict",
+    "smoke:live": "node scripts/live-smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.58.2"
+  }
+}

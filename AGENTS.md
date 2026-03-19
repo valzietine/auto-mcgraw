@@ -10,12 +10,11 @@
 - `content-scripts/deepseek.js` -> `deepseek_html_reference.html`
 - `content-scripts/chatgpt.js` -> `chatgpt_html_reference.html` (placeholder)
 - `content-scripts/gemini.js` -> `gemini_html_reference.html` (placeholder)
-- `content-scripts/ezto-mheducation.js` -> `ezto_mheducation_html_reference.html` (placeholder)
+- `content-scripts/ezto-mheducation.js` -> `ezto_mheducation_html_reference.html`
 - `content-scripts/mheducation.js` -> one file per question type in `mheducation_html_references/`
 
 ### Current McGraw Placeholders
 
-- `mheducation_html_references/multiple_choice.html`
 - `mheducation_html_references/multi_select.html`
 - `mheducation_html_references/fill_in_the_blank.html`
 - `mheducation_html_references/dropdown.html`
@@ -47,6 +46,7 @@
 - For a reusable live Chrome session, launch Chrome detached with `--remote-debugging-port=9222`, `--user-data-dir=<repo>\output\playwright\issue-6-live\chrome-profile`, `--disable-extensions-except=<repo>`, and `--load-extension=<repo>`.
 - The `issue-6-live` profile already contained useful state for `learn.luzerne.edu`, `learning.mheducation.com`, and `chat.deepseek.com`; prefer reusing that profile for LMS/McGraw diagnostics before creating a fresh one.
 - Save live-test artifacts under `output/playwright/issue-6-live/` so screenshots and diagnostics stay grouped with the profile that produced them.
+- Repo-local non-live smoke scripts now live in `scripts/`: use `npm run smoke:fixtures` for offline HTML-reference checks and `npm run smoke:live` later for opt-in CDP selector smoke checks against an already-running Chrome session.
 
 ## Maintenance And Troubleshooting
 
@@ -55,3 +55,4 @@
 - If an existing reproducibility note is outdated or no longer works, revise or replace it instead of leaving stale operational guidance behind.
 - If this file says a tool or path should be available and the current run is hanging or failing, do not treat that as final immediately. Persist through basic troubleshooting first: verify the binary/path, confirm auth, check for process/session conflicts, check ports and profile locks, try the documented alternate launch or attach path, and only report a blocker after those checks still fail.
 - After live-browser or tooling runs, check `git status` before handoff and clean up or ignore generated artifacts so huge browser profiles, copied session data, temp installs, and similar runtime output do not appear as accidental source changes.
+- March 17, 2026 live validation note: Chrome launched correctly with quoted `--remote-debugging-port=9222`, `--user-data-dir`, `--disable-extensions-except`, and `--load-extension` flags, but the unpacked extension still did not surface in `chrome://extensions/` or as an automation-visible extension worker. When that happens, a workable fallback for DOM-level live validation is to attach over CDP to the same Chrome session and inject the target content-script source into the live assistant page with a stubbed `chrome.runtime`.

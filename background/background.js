@@ -574,7 +574,15 @@ async function processResponse(message) {
     cacheCompletedQuestionId(completedId);
     clearPendingAiRequest("response_processed");
   } catch (error) {
-    console.error("Error processing AI response:", error);
+    const failedQuestionId = message.questionId || pendingAiRequest?.questionId || null;
+    logWarn("Error delivering AI response to MHE:", getErrorMessage(error));
+    if (failedQuestionId) {
+      await notifyMheTimeout(
+        failedQuestionId,
+        "Could not deliver the AI response back to McGraw. Please retry the question flow."
+      );
+    }
+    clearPendingAiRequest("mhe_delivery_failed");
   }
 }
 
